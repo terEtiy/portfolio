@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Analisator</title>
+    <style></style>
+  </head>
+  <body>
+    <script>
+      class NewScriptLexer {
+        constructor() {
+          this.tokens = [];
+          this.position = 0;
+          this.line = 1;
+          this.column = 1;
+          this.input = "";
+          this.currentChar = "";
+        }
+
+        // Основные типы токенов
+        static TokenTypes = {
+          // Ключевые слова
+          KEYWORD: "KEYWORD",
+          IDENTIFIER: "IDENTIFIER",
+
+          // Литералы
+          STRING: "STRING",
+          NUMBER: "NUMBER",
+          BOOLEAN: "BOOLEAN",
+
+          // Специальные конструкции
+          DOM_ELEMENT: "DOM_ELEMENT",
+          XPATH: "XPATH",
+          METHOD_CALL: "METHOD_CALL",
+
+          // Операторы
+          OPERATOR: "OPERATOR",
+          COMPARISON: "COMPARISON",
+          LOGICAL: "LOGICAL",
+
+          // Скобки
+          LPAREN: "LPAREN",
+          RPAREN: "RPAREN",
+          LBRACE: "LBRACE",
+          RBRACE: "RBRACE",
+
+          // Разделители
+          DOT: "DOT",
+          COMMA: "COMMA",
+          SEMICOLON: "SEMICOLON",
+          COLON: "COLON",
+
+          // Прочее
+          EOF: "EOF",
+          UNKNOWN: "UNKNOWN",
+        };
+
+        // Ключевые слова нового скрипта
+        static Keywords = {
+          if: "IF",
+          else: "ELSE",
+          logAdd: "LOGADD",
+          value: "VALUE",
+          error: "ERROR",
+        };
+
+        // Методы DOM элементов
+        static DomMethods = {
+          Get_text: "GET_TEXT",
+          Клик: "CLICK",
+          Цикл_по_списку: "FOR_EACH",
+        };
+
+        // Операторы
+        static Operators = {
+          "=": "ASSIGN",
+          "==": "EQUAL",
+          "!=": "NOT_EQUAL",
+          "&&": "AND",
+          "||": "OR",
+          "!": "NOT",
+        };
+
+        init(input) {
+          this.input = input;
+          this.position = 0;
+          this.line = 1;
+          this.column = 1;
+          this.tokens = [];
+          this.currentChar = this.input.length > 0 ? this.input[0] : null;
+        }
+
+        advance() {
+          this.position++;
+          if (this.position >= this.input.length) {
+            this.currentChar = null;
+          } else {
+            this.currentChar = this.input[this.position];
+            this.column++;
+          }
+        }
+
+        peek(offset = 1) {
+          const peekPos = this.position + offset;
+          if (peekPos >= this.input.length) {
+            return null;
+          }
+          return this.input[peekPos];
+        }
+
+        skipWhitespace() {
+          while (this.currentChar !== null && /\s/.test(this.currentChar)) {
+            if (this.currentChar === "\n") {
+              this.line++;
+              this.column = 1;
+            }
+            this.advance();
+          }
+        }
+
+        skipComment() {
+          if (this.currentChar === "/" && this.peek() === "/") {
+            while (this.currentChar !== null && this.currentChar !== "\n") {
+              this.advance();
+            }
+            this.skipWhitespace();
+          }
+        }
+
+        getNumber() {
+          let result = "";
+          while (this.currentChar !== null && /[0-9]/.test(this.currentChar)) {
+            result += this.currentChar;
+            this.advance();
+          }
+          return {
+            type: NewScriptLexer.TokenTypes.NUMBER,
+            value: parseInt(result, 10),
+            line: this.line,
+            column: this.column - result.length,
+          };
+        }
+
+        getString() {
+          let result = "";
+          const startLine = this.line;
+          const startCol = this.column;
+
+          // Пропускаем открывающую кавычку
+          this.advance();
+
+          while (this.currentChar !== null && this.currentChar !== '"') {
+            if (this.currentChar === "\\") {
+              this.advance(); // Пропускаем \
+              if (this.currentChar !== null) {
+                result += this.currentChar;
+              }
+            } else {
+              result += this.currentChar;
+            }
+            this.advance();
+          }
+
+          // Пропускаем закрывающую кавычку
+          if (this.currentChar === '"') {
+            this.advance();
+          }
+
+          return {
+            type: NewScriptLexer.TokenTypes.STRING,
+            value: result,
+            line: startLine,
+            column: startCol,
+          };
+        }
+
+        getIdentifier() {
+          let result = "";
+          const startCol = this.column;
+
+          while (this.currentChar !== null && /[a-zA-Zа-яА-Я0-9_]/.test(this.currentChar)) {
+            result += this.currentChar;
+            this.advance();
+          }
+
+          // Проверяем, является ли идентификатор ключевым словом
+          if (NewScriptLexer.Keywords[result]) {
+            return {
+              type: NewScriptLexer.TokenTypes.KEYWORD,
+              value: result,
+              keywordType: NewScriptLexer.Keywords[result],
+              line: this.line,
+              column: startCol,
+            };
+          }
+
+          // Проверяем, является ли методом DOM элемента
+          if (NewScriptLexer.DomMethods[result]) {
+            return {
+              type: NewScriptLexer.TokenTypes.METHOD_CALL,
+              value: result,
+              methodType: NewScriptLexer.DomMethods[result],
+              line: this.line,
+              column: startCol,
+            };
+          }
+
+          // Проверяем булевые значения
+          if (result === "true" || result === "false") {
+            return {
+              type: NewScriptLexer.TokenTypes.BOOLEAN,
+              value: result === "true",
+              line: this.line,
+              column: startCol,
+            };
+          }
+
+          return {
+            type: NewScriptLexer.TokenTypes.IDENTIFIER,
+            value: result,
+            line: this.line,
+            column: startCol,
+          };
+        }
+
+        getDomElement() {
+          let xpath = "";
+          const startLine = this.line;
+          const startCol = this.column;
+
+          // Пропускаем "DomElement{"
+          while (this.currentChar !== null && this.currentChar !== "{") {
+            this.advance();
+          }
+          this.advance(); // Пропускаем {
+
+          // Читаем XPath внутри фигурных скобок
+          while (this.currentChar !== null && this.currentChar !== "}") {
+            xpath += this.currentChar;
+            this.advance();
+          }
+
+          // Пропускаем закрывающую }
+          if (this.currentChar === "}") {
+            this.advance();
+          }
+
+          return {
+            type: NewScriptLexer.TokenTypes.DOM_ELEMENT,
+            value: xpath,
+            line: startLine,
+            column: startCol,
+          };
+        }
+
+        getXPath() {
+          let xpath = "";
+          const startLine = this.line;
+          const startCol = this.column;
+
+          // Пропускаем открывающий символ
+          if (this.currentChar === "/") {
+            xpath += this.currentChar;
+            this.advance();
+          }
+
+          // Читаем весь XPath
+          while (this.currentChar !== null && this.currentChar !== "}" && this.currentChar !== ")") {
+            xpath += this.currentChar;
+            this.advance();
+          }
+
+          return {
+            type: NewScriptLexer.TokenTypes.XPATH,
+            value: xpath,
+            line: startLine,
+            column: startCol,
+          };
+        }
+
+        getOperator() {
+          const startCol = this.column;
+
+          // Проверяем двухсимвольные операторы
+          if (this.currentChar === "=" && this.peek() === "=") {
+            this.advance();
+            this.advance();
+            return {
+              type: NewScriptLexer.TokenTypes.COMPARISON,
+              value: "==",
+              operatorType: NewScriptLexer.Operators["=="],
+              line: this.line,
+              column: startCol,
+            };
+          }
+
+          if (this.currentChar === "!" && this.peek() === "=") {
+            this.advance();
+            this.advance();
+            return {
+              type: NewScriptLexer.TokenTypes.COMPARISON,
+              value: "!=",
+              operatorType: NewScriptLexer.Operators["!="],
+              line: this.line,
+              column: startCol,
+            };
+          }
+
+          if (this.currentChar === "&" && this.peek() === "&") {
+            this.advance();
+            this.advance();
+            return {
+              type: NewScriptLexer.TokenTypes.LOGICAL,
+              value: "&&",
+              operatorType: NewScriptLexer.Operators["&&"],
+              line: this.line,
+              column: startCol,
+            };
+          }
+
+          if (this.currentChar === "|" && this.peek() === "|") {
+            this.advance();
+            this.advance();
+            return {
+              type: NewScriptLexer.TokenTypes.LOGICAL,
+              value: "||",
+              operatorType: NewScriptLexer.Operators["||"],
+              line: this.line,
+              column: startCol,
+            };
+          }
+
+          // Односимвольные операторы
+          const char = this.currentChar;
+          this.advance();
+
+          if (NewScriptLexer.Operators[char]) {
+            return {
+              type: NewScriptLexer.TokenTypes.OPERATOR,
+              value: char,
+              operatorType: NewScriptLexer.Operators[char],
+              line: this.line,
+              column: startCol,
+            };
+          }
+
+          return null;
+        }
+
+        getNextToken() {
+          this.skipWhitespace();
+          this.skipComment();
+
+          if (this.currentChar === null) {
+            return {
+              type: NewScriptLexer.TokenTypes.EOF,
+              value: "EOF",
+              line: this.line,
+              column: this.column,
+            };
+          }
+
+          // Обработка чисел
+          if (/[0-9]/.test(this.currentChar)) {
+            return this.getNumber();
+          }
+
+          // Обработка строк
+          if (this.currentChar === '"') {
+            return this.getString();
+          }
+
+          // Обработка DOM элементов
+          if (this.currentChar === "D" && this.input.substr(this.position, 10) === "DomElement") {
+            return this.getDomElement();
+          }
+
+          // Обработка XPath (когда он встречается отдельно)
+          if (this.currentChar === "/") {
+            return this.getXPath();
+          }
+
+          // Обработка операторов
+          if (["=", "!", "&", "|", ">", "<"].includes(this.currentChar)) {
+            const operator = this.getOperator();
+            if (operator) {
+              return operator;
+            }
+          }
+
+          // Обработка скобок
+          if (this.currentChar === "(") {
+            const token = {
+              type: NewScriptLexer.TokenTypes.LPAREN,
+              value: "(",
+              line: this.line,
+              column: this.column,
+            };
+            this.advance();
+            return token;
+          }
+
+          if (this.currentChar === ")") {
+            const token = {
+              type: NewScriptLexer.TokenTypes.RPAREN,
+              value: ")",
+              line: this.line,
+              column: this.column,
+            };
+            this.advance();
+            return token;
+          }
+
+          if (this.currentChar === "{") {
+            const token = {
+              type: NewScriptLexer.TokenTypes.LBRACE,
+              value: "{",
+              line: this.line,
+              column: this.column,
+            };
+            this.advance();
+            return token;
+          }
+
+          if (this.currentChar === "}") {
+            const token = {
+              type: NewScriptLexer.TokenTypes.RBRACE,
+              value: "}",
+              line: this.line,
+              column: this.column,
+            };
+            this.advance();
+            return token;
+          }
+
+          // Обработка точек и других разделителей
+          if (this.currentChar === ".") {
+            const token = {
+              type: NewScriptLexer.TokenTypes.DOT,
+              value: ".",
+              line: this.line,
+              column: this.column,
+            };
+            this.advance();
+            return token;
+          }
+
+          if (this.currentChar === ",") {
+            const token = {
+              type: NewScriptLexer.TokenTypes.COMMA,
+              value: ",",
+              line: this.line,
+              column: this.column,
+            };
+            this.advance();
+            return token;
+          }
+
+          if (this.currentChar === ";") {
+            const token = {
+              type: NewScriptLexer.TokenTypes.SEMICOLON,
+              value: ";",
+              line: this.line,
+              column: this.column,
+            };
+            this.advance();
+            return token;
+          }
+
+          if (this.currentChar === ":") {
+            const token = {
+              type: NewScriptLexer.TokenTypes.COLON,
+              value: ":",
+              line: this.line,
+              column: this.column,
+            };
+            this.advance();
+            return token;
+          }
+
+          // Обработка идентификаторов и ключевых слов
+          if (/[a-zA-Zа-яА-Я_]/.test(this.currentChar)) {
+            return this.getIdentifier();
+          }
+
+          // Неизвестный символ
+          const token = {
+            type: NewScriptLexer.TokenTypes.UNKNOWN,
+            value: this.currentChar,
+            line: this.line,
+            column: this.column,
+          };
+          this.advance();
+          return token;
+        }
+
+        tokenize(input) {
+          this.init(input);
+          this.tokens = [];
+
+          while (true) {
+            const token = this.getNextToken();
+            this.tokens.push(token);
+
+            if (token.type === NewScriptLexer.TokenTypes.EOF) {
+              break;
+            }
+          }
+
+          return this.tokens;
+        }
+
+        // Вспомогательный метод для красивого вывода токенов
+        printTokens() {
+          console.log("Лексический анализ нового скрипта:");
+          console.log("=".repeat(80));
+
+          this.tokens.forEach((token, index) => {
+            if (token.type === NewScriptLexer.TokenTypes.EOF) {
+              console.log(`${index.toString().padStart(3)}. ${token.type.padEnd(15)}`);
+              return;
+            }
+
+            let tokenInfo = `${index.toString().padStart(3)}. ${token.type.padEnd(15)} '${token.value}'`;
+
+            // Добавляем дополнительную информацию
+            if (token.keywordType) {
+              tokenInfo += ` (${token.keywordType})`;
+            } else if (token.methodType) {
+              tokenInfo += ` (${token.methodType})`;
+            } else if (token.operatorType) {
+              tokenInfo += ` (${token.operatorType})`;
+            }
+
+            tokenInfo += ` [строка ${token.line}, столбец ${token.column}]`;
+            console.log(tokenInfo);
+          });
+
+          console.log("=".repeat(80));
+          console.log(this.tokens);
+        }
+      }
+
+      // Пример использования лексического анализатора
+      const newScriptExample = `
+DomElement{/html[1]/body[1]/div[1]/input[1]}.Цикл_по_списку.{1~2~3~4~5}
+DomElement{/html[1]/body[1]/div[4]/button[1]}.Клик
+if (DomElement{/html[1]/body[1]/div[1]/input[1]}.Get_text() == DomElement{/html[1]/body[1]/div[2]/input[1]}.Get_text()){
+    if(DomElement{/html[1]/body[1]/div[4]/button[1]}){
+        DomElement{/html[1]/body[1]/div[4]/button[1]}.Клик
+            if(DomElement{/html[1]/body[1]/div[2]/input[1]}.Get_text() == 2){
+                DomElement{/html[1]/body[1]/div[4]/button[2]}.Клик
+                logAdd.value = "Скрипт завершен"
+            }else{
+            logAdd.erorr.value = "Значение не = 2"
+            }
+        }else{
+        logAdd.value = "Кнопки нет"
+        }
+    } else{
+    logAdd.erorr.DomElement{/html[1]/body[1]/div[1]/input[1]}.Get_text()
+    logAdd.erorr.value = "Ошибка"
+}`;
+
+      // Тестирование лексического анализатора
+      const lexer = new NewScriptLexer();
+      const tokens = lexer.tokenize(newScriptExample);
+      lexer.printTokens();
+    </script>
+  </body>
+</html>

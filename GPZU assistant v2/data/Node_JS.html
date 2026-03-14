@@ -1,0 +1,1846 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Карта с линиями</title>
+    <style>
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        height: 100%;
+        background-color: black;
+      }
+      .map {
+        position: relative;
+        width: 5000px;
+        height: 5000px;
+        background: radial-gradient(
+            circle,
+            rgba(128, 128, 128, 0.8) 2px,
+            transparent 2px
+          ),
+          radial-gradient(circle, rgba(255, 204, 0, 0.8) 1px, transparent 1px);
+        cursor: grab;
+        filter: blur(0.5px);
+        top: 0;
+        left: 0;
+        overflow: hidden;
+        transform-origin: 0 0;
+        transform: scale(1);
+      }
+      .map:active {
+        cursor: grabbing;
+      }
+      .add-element-btn {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        z-index: 1000;
+      }
+      .draggable-element {
+        border: 2px solid #ff5733;
+        border-radius: 5px;
+        background-color: rgba(255, 87, 51);
+        position: absolute;
+        cursor: grab;
+        width: 100px;
+        height: 50px;
+        z-index: 2;
+      }
+      .draggable-element.selected {
+        border: 3px solid #00ff00;
+      }
+      .draggable-element.highlight {
+        border: 3px solid #ffff00;
+      }
+      .Light {
+        outline: 3px solid yellow; /* Желтая обводка */
+        box-shadow: 0 0 10px rgba(255, 241, 40, 0.7); /* Мягкая желтая тень */
+        background-color: rgba(
+          255,
+          255,
+          0,
+          0.2
+        ); /* Легкий желтый фон для эффекта свечения */
+        transition: all 0.1s ease-in-out; /* Плавный переход для эффекта */
+      }
+      .Light_connecting {
+        outline: 3px solid rgb(0, 255, 238); /* Желтая обводка */
+        box-shadow: 0 0 10px rgba(255, 241, 40, 0.7); /* Мягкая желтая тень */
+        background-color: rgba(
+          255,
+          255,
+          0,
+          0.2
+        ); /* Легкий желтый фон для эффекта свечения */
+        transition: all 0.1s ease-in-out; /* Плавный переход для эффекта */
+      }
+      .Node_connect {
+        outline: 3px solid rgb(87, 87, 87); /* Желтая обводка */
+        box-shadow: 0 0 10px rgba(224, 224, 224, 0.7); /* Мягкая желтая тень */
+        background-color: rgba(
+          223,
+          223,
+          222,
+          0.2
+        ); /* Легкий желтый фон для эффекта свечения */
+        transition: all 0.1s ease-in-out; /* Плавный переход для эффекта */
+      }
+      .draggable-element:active {
+        cursor: grabbing;
+      }
+      .connection-line {
+        position: absolute;
+        background-color: red;
+        z-index: 1; /* Линии должны быть под элементами */
+        border: none; /* Убираем стандартную границу */
+      }
+
+      .connection-line::before {
+        content: "";
+        position: absolute;
+        top: 0%;
+        left: 0;
+        width: 100%;
+        height: 5px; /* Толщина линии */
+        background: linear-gradient(90deg, #ff5733 50%, transparent 50%);
+        background-size: 10px 2px; /* Размеры пунктиров */
+        animation: dash 0.5s linear infinite;
+      }
+
+      @keyframes dash {
+        from {
+          background-position: 0 0;
+        }
+        to {
+          background-position: 10px 0;
+        }
+      }
+      #contextMenu {
+        display: none; /* Скрыто по умолчанию */
+        position: absolute; /* Позволяет расположить меню в зависимости от клика */
+        background-color: #ffffff; /* Белый фон для меню */
+        border: 1px solid #ccc; /* Светло-серый бордер */
+        border-radius: 4px; /* Скругленные углы */
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Легкая тень для выделения */
+        z-index: 1000; /* Обеспечивает, что меню будет поверх других элементов */
+        width: 250px; /* Фиксированная ширина меню */
+      }
+
+      #contextMenu button {
+        display: block; /* Кнопки занимают всю ширину меню */
+        width: 100%; /* Занимает всю ширину меню */
+        border: none; /* Без рамок у кнопок */
+        background: none; /* Без фона у кнопок */
+        padding: 10px; /* Внутренние отступы для кнопок */
+        text-align: left; /* Выравнивание текста по левому краю */
+        cursor: pointer; /* Курсор в виде руки при наведении */
+        font-size: 14px; /* Размер шрифта для кнопок */
+        color: #333; /* Цвет текста кнопок */
+        border-bottom: 1px solid #ddd; /* Разделительная линия между кнопками */
+      }
+
+      #contextMenu button:last-child {
+        border-bottom: none; /* Убираем нижнюю границу у последней кнопки */
+      }
+
+      #contextMenu button:hover {
+        background-color: #f0f0f0; /* Цвет фона кнопок при наведении */
+      }
+
+      #dropArea {
+        width: auto;
+        height: 100px;
+        border: 4px dashed #ccc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 1px;
+      }
+
+      #dropArea.dragover {
+        border-color: #000;
+      }
+
+      .save-scenario-btn,
+      .load-scenario-btn {
+        position: absolute;
+        top: 10px;
+        left: 180px;
+        padding: 10px 20px;
+        background-color: #28a745;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        z-index: 1000;
+      }
+
+      .load-scenario-btn {
+        left: 370px;
+        background-color: #17a2b8;
+      }
+
+      .slider-container {
+        display: flex;
+        position: absolute;
+        top: 13px;
+        left: 545px;
+      }
+
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+      }
+
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: 0.4s;
+      }
+
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: 0.4s;
+      }
+
+      input:checked + .slider {
+        background-color: #2196f3;
+      }
+
+      input:checked + .slider:before {
+        transform: translateX(26px);
+      }
+
+      .slider.round {
+        border-radius: 34px;
+      }
+
+      .slider.round:before {
+        border-radius: 50%;
+      }
+      .modal {
+        display: none; /* Скрыто по умолчанию */
+        position: fixed;
+        z-index: 1;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(
+          0,
+          0,
+          0,
+          0.6
+        ); /* Более темный фон для большей концентрации */
+        backdrop-filter: blur(5px); /* Размытие фона */
+      }
+
+      .modal-content {
+        background-color: #ffffff;
+        margin: 10% auto;
+        padding: 30px;
+        border-radius: 15px; /* Закругленные углы */
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); /* Плавная тень */
+        width: 70%;
+        max-width: 600px; /* Ограничение ширины */
+        animation: slideIn 0.5s ease; /* Анимация появления */
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(-50px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .close {
+        color: #ff8a8a;
+        float: right;
+        font-size: 38px;
+        font-weight: bold;
+        transition: color 0.3s ease;
+        border-radius: 15px; /* Плавные углы при наведении */
+      }
+
+      .close:hover,
+      .close:focus {
+        color: #333;
+        cursor: pointer;
+        border-radius: 15px; /* Плавные углы при наведении */
+      }
+
+      .file-icon {
+        display: inline-block;
+        text-align: center;
+        margin: 10px;
+        border-radius: 15px; /* Плавные углы при наведении */
+        transition: transform 0.3s ease, box-shadow 0.3s ease; /* Плавные трансформации */
+      }
+
+      .file-icon img {
+        width: 60px;
+        height: 60px;
+        border-radius: 10px; /* Закругленные углы для изображений */
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* Тень для изображений */
+      }
+
+      .file-icon p {
+        margin: 8px 0 0 0;
+        font-size: 14px;
+        color: #555; /* Более мягкий цвет текста */
+        border-radius: 15px; /* Плавные углы при наведении */
+      }
+
+      .file-icon:hover {
+        transform: scale(1.05); /* Легкое увеличение при наведении */
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); /* Усиление тени */
+        border-radius: 15px; /* Плавные углы при наведении */
+      }
+      h4 {
+        margin: 10px; /* Убирает отступы по умолчанию */
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="map-container">
+      <div class="map" id="map"></div>
+    </div>
+    <button class="add-element-btn" id="addElementBtn">Добавить элемент</button>
+    <button class="save-scenario-btn" id="saveScenarioBtn">
+      Сохранить сценарий
+    </button>
+    <button class="load-scenario-btn" id="loadScenarioBtn">
+      Добавить сценарий
+    </button>
+
+    <div class="slider-container">
+      <label class="switch">
+        <input type="checkbox" id="slider" />
+        <span class="slider round"></span>
+      </label>
+    </div>
+
+    <input type="file" id="fileInput" style="display: none" />
+    <div id="contextMenu">
+      <button id="chooseComponentBtn">Выберите компонент</button>
+      <button id="clearStorage">Удалить загруженные компоненты</button>
+      <div id="dropArea">Перетащите файлы сюда</div>
+      <h4>Загруженные компоненты</h4>
+      <ul id="fileList"></ul>
+      <div
+        id="tooltip"
+        style="
+          position: absolute;
+          display: none;
+          background-color: #f9f9f9;
+          border: 1px solid #ccc;
+          padding: 5px;
+          z-index: 1000;
+        "
+      ></div>
+      <div id="fileModal" class="modal">
+        <div class="modal-content">
+          <span class="close">&times;</span>
+          <div id="fileIcons"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      //      <button id="createComponentBtn">Создать компонент</button>
+      ////////////////////////////////////////////////// объявление глобальных переменных  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+      //#region var
+      //TODO: var_  объявление глобальных переменных
+
+      const map = document.getElementById("map");
+      const addElementBtn = document.getElementById("addElementBtn");
+
+      let isDraggingMap = false;
+      let isDraggingElement = false;
+      let selectedElement = null;
+      let startX, startY, initialLeft, initialTop;
+      let connecting = false;
+      let startElement = null;
+      let line = null;
+      let load = false;
+      let load_line = false;
+      let isDraggingSelection = false; // Состояние для выделения
+      let selectionBox = null; // Элемент для области выделения
+      let selectionStartX, selectionStartY; // Начальные координаты области выделения
+      let initialPositions = {};
+      let indexMainElement = 0;
+      let inputNodes = 0;
+      let outputNodes = 0;
+      // Массив для хранения данных о элементах
+      let elementsData = [];
+
+      // Массив для хранения данных о линиях
+      let linesData = [];
+
+      // Массив для хранения загруженых скриптов
+      let savedScripts = [];
+
+      // Массив для хранения выбранных элементов
+      let selectedElements = [];
+
+      // Массив для хранения данных о точках подключения
+      let connectionPoint = [];
+
+      // Настройки сетки
+      let gridSize = 80;
+
+      // Обновление размера сетки
+      function updateGridSize() {
+        map.style.backgroundSize = `${gridSize}px ${gridSize}px`;
+        map.style.backgroundPosition = `0 0, ${gridSize / 2}px ${
+          gridSize / 2
+        }px`;
+      }
+
+      updateGridSize();
+
+      // Масштабирование колесиком мыши
+      /*       window.addEventListener('wheel', (e) => {
+                        const scaleAmount = 0.1;
+                         scale = parseFloat(getComputedStyle(map).transform.split(',')[0].replace('matrix(', ''));
+
+                        if (e.deltaY < 0) {
+                            scale += scaleAmount;
+                        } else {
+                            scale = Math.max(scaleAmount, scale - scaleAmount);
+                        }
+                        map.style.transform = `scale(${scale})`;
+                        updateGridSize();
+                    });
+            */
+      //#endregion
+      ////////////////////////////////////////////////// объявление глобальных переменных  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+      ////////////////////////////////////////////////// Перетаскивание карты + кнопка создать  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+      //#region task_map and other shit
+      //TODO: task_map_  Перетаскивание карты + кнопка создать + выделение
+
+      function removeSelectedClass(elements) {
+        elements.forEach((item) => {
+          if (item.element) {
+            item.element.classList.remove("selected");
+          }
+        });
+      }
+
+      map.addEventListener("mousedown", (e) => {
+        if (e.button === 0) {
+          if (!isDraggingElement && !connecting) {
+            isDraggingMap = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            initialLeft = parseInt(window.getComputedStyle(map).left, 10) || 0;
+            initialTop = parseInt(window.getComputedStyle(map).top, 10) || 0;
+            console.log("selectedElements", selectedElements);
+
+            /// Дебаг
+            console.log("elementsData", elementsData);
+            console.log("linesData", linesData);
+            console.log("savedScripts", savedScripts);
+            console.log("connectionPoint", connectionPoint);
+          }
+        }
+      });
+
+
+      map.addEventListener("mouseleave", () => {
+        isDraggingSelection = false;
+        if (selectionBox != null) {
+          map.removeChild(selectionBox);
+          selectionBox = null;
+        }
+        isDraggingMap = false;
+      });
+
+      map.addEventListener("mousedown", (e) => {
+        if (e.button === 2 && !isDraggingElement && !connecting) {
+          removeSelectedClass(selectedElements);
+          selectedElements = [];
+        }
+      });
+
+      map.addEventListener("mousedown", (e) => {
+        if (e.shiftKey && !isDraggingElement && !connecting) {
+          if (e.button === 2) {
+            console.log("начало выделения");
+
+            // Получаем позицию карты
+            const mapRect = map.getBoundingClientRect();
+
+            // Вычисляем начальные координаты выделения относительно карты
+            selectionStartX = e.clientX - mapRect.left;
+            selectionStartY = e.clientY - mapRect.top;
+
+            isDraggingSelection = true;
+            selectionBox = document.createElement("div");
+            selectionBox.style.position = "absolute";
+            selectionBox.style.border = "1px dashed #000";
+            selectionBox.style.backgroundColor = "rgba(0, 255, 0, 0.3)";
+            selectionBox.style.zIndex = 9999;
+            selectionBox.style.left = `${selectionStartX}px`;
+            selectionBox.style.top = `${selectionStartY}px`;
+            map.appendChild(selectionBox);
+          }
+        }
+      });
+
+      map.addEventListener("mousemove", (e) => {
+        if (isDraggingMap & !isDraggingSelection & !isDraggingElement) {
+          const deltaX = e.clientX - startX;
+          const deltaY = e.clientY - startY;
+
+          // Получаем размеры карты и окна
+          const mapRect = map.getBoundingClientRect();
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+
+          // Ограничиваем перемещение карты
+          const newLeft = Math.max(
+            Math.min(initialLeft + deltaX, 0),
+            viewportWidth - mapRect.width
+          );
+          const newTop = Math.max(
+            Math.min(initialTop + deltaY, 0),
+            viewportHeight - mapRect.height
+          );
+
+          map.style.left = `${newLeft}px`;
+          map.style.top = `${newTop}px`;
+        }
+        if (isDraggingElement) {
+          e.preventDefault();
+          isDraggingMap = false;
+          const x = e.clientX;
+          const y = e.clientY;
+          const deltaX = x - startX;
+          const deltaY = y - startY;
+          selectedElement.style.left = `${initialLeft + deltaX}px`;
+          selectedElement.style.top = `${initialTop + deltaY}px`;
+
+          // Обновляем данные о элементе в массиве
+          const index = elementsData.findIndex(
+            (e) => e.index === parseInt(selectedElement.dataset.index)
+          );
+          if (index !== -1) {
+            elementsData[index].left = parseInt(selectedElement.style.left, 10);
+            elementsData[index].top = parseInt(selectedElement.style.top, 10);
+          }
+
+          // Обновляем линии, связанные с элементом
+          updateLines();
+        }
+
+        if (isDraggingSelection) {
+          console.log("изменение размеров выделения");
+
+          // Получаем позицию карты
+          const mapRect = map.getBoundingClientRect();
+
+          // Текущие координаты выделения относительно карты
+          const currentX = e.clientX - mapRect.left;
+          const currentY = e.clientY - mapRect.top;
+
+          const width = Math.abs(currentX - selectionStartX);
+          const height = Math.abs(currentY - selectionStartY);
+
+          selectionBox.style.width = `${width}px`;
+          selectionBox.style.height = `${height}px`;
+          selectionBox.style.left = `${Math.min(currentX, selectionStartX)}px`;
+          selectionBox.style.top = `${Math.min(currentY, selectionStartY)}px`;
+        }
+
+        // Обработчик отпускания кнопок мыши
+        map.addEventListener("mouseup", (e) => {
+          if (isDraggingSelection) {
+            // Завершаем выделение
+            isDraggingSelection = false;
+            if (selectionBox) {
+              // Определяем элементы, попадающие в область выделения
+              const boxRect = selectionBox.getBoundingClientRect();
+              const mapRect = map.getBoundingClientRect();
+
+              const boxLeft = boxRect.left - mapRect.left;
+              const boxTop = boxRect.top - mapRect.top;
+              const boxRight = boxLeft + boxRect.width;
+              const boxBottom = boxTop + boxRect.height;
+
+              document.querySelectorAll(".draggable-element").forEach((el) => {
+                const elRect = el.getBoundingClientRect();
+
+                const elLeft = elRect.left - mapRect.left;
+                const elTop = elRect.top - mapRect.top;
+                const elRight = elLeft + elRect.width;
+                const elBottom = elTop + elRect.height;
+
+                if (
+                  elLeft < boxRight &&
+                  elRight > boxLeft &&
+                  elTop < boxBottom &&
+                  elBottom > boxTop
+                ) {
+                  el.classList.add("selected"); // Применяем класс выделения
+                  selectedElements.push({
+                    element: el,
+                  });
+                }
+              });
+              // Удаляем элемент области выделения
+              map.removeChild(selectionBox);
+              selectionBox = null;
+            }
+          } else {
+            isDraggingMap = false;
+          }
+        });
+        /*
+        if (connecting && line) {
+          const scale = parseFloat(
+            getComputedStyle(map).transform.split(",")[0].replace("matrix(", "")
+          );
+          const x1 =
+            (parseInt(startElement.style.left) + startElement.offsetWidth / 2) /
+            scale;
+          const y1 =
+            (parseInt(startElement.style.top) + startElement.offsetHeight / 2) /
+            scale;
+          const x2 =
+            (e.clientX - map.getBoundingClientRect().left + map.scrollLeft) /
+            scale;
+          const y2 =
+            (e.clientY - map.getBoundingClientRect().top + map.scrollTop) /
+            scale;
+          updateConnectionLine(line, x1, y1, x2, y2);
+        }
+          */
+      });
+
+      // Добавление нового элемента
+      addElementBtn.addEventListener("click", () => {
+        createElement();
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.ctrlKey && e.key === "c") {
+          // Обработка события Ctrl + C
+          console.log("Нажато Ctrl + C");
+          // Добавьте сюда свой код для обработки копирования
+        }
+
+        if (e.ctrlKey && e.key === "v") {
+          // Обработка события Ctrl + V
+          console.log("Нажато Ctrl + V");
+          // Добавьте сюда свой код для обработки вставки
+        }
+      });
+
+      //#endregion
+      ////////////////////////////////////////////////// Перетаскивание карты + кнопка создать  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+      ////////////////////////////////////////////////// создание элемента + логика обновление дебага + свитч  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+      //#region Create_element_update depug_swich
+      //TODO: Create_element_update depug_swich_  создание элемента + логика обновление дебага + свитч
+
+      let nextIndex =
+        elementsData.length > 0
+          ? elementsData[elementsData.length - 1].index + 1
+          : 0;
+
+      function createElement(load, idx) {
+        if (load == true) {
+          // Находим данные элемента по индексу
+          elementDataLoad = elementsData.find(
+            (data) => data.index === Number(idx)
+          );
+          if (elementDataLoad) {
+            console.log("load", load, elementDataLoad, idx);
+            console.log("nextIndex", nextIndex);
+            const element = document.createElement("div");
+            element.className = "draggable-element";
+            element.setAttribute("data-number_index", nextIndex);
+            element.style.left = `${elementDataLoad.left}px`;
+            element.style.top = `${elementDataLoad.top}px`;
+            element.style.position = "absolute";
+            element.style.color = "white";
+            element.style.fontWeight = "bold";
+            element.style.textAlign = "center";
+            element.style.alignItems = "center";
+            element.style.justifyContent = "center";
+
+            map.appendChild(element);
+            makeElementDraggable(element);
+
+            if (elementsData[idx].component != null) {
+              console.log(elementsData[idx].component);
+              fulfilledScript(idx);
+            }
+          }
+        } else {
+          const itemsPerRow = 5; // Количество элементов в одной строке
+          const elementWidth = 150; // Ширина элемента плюс расстояние между элементами
+          const rowHeight = 100; // Высота строки плюс расстояние между строками
+
+          console.log("nextIndex", nextIndex);
+          const element = document.createElement("div");
+          element.className = "draggable-element";
+          element.setAttribute("data-number_index", nextIndex);
+          const leftPosition = 100 + (nextIndex % itemsPerRow) * elementWidth;
+          const topPosition =
+            100 + Math.floor(nextIndex / itemsPerRow) * rowHeight;
+          element.style.left = `${leftPosition}px`;
+          element.style.top = `${topPosition}px`;
+          element.style.position = "absolute";
+          element.style.color = "white";
+          element.style.fontWeight = "bold";
+          element.style.textAlign = "center";
+          element.style.alignItems = "center";
+          element.style.justifyContent = "center";
+          element.style.height = "50px";
+          element.style.width = "80px";
+
+          // Добавляем элемент на карту
+          map.appendChild(element);
+          makeElementDraggable(element);
+
+          initialLeft = parseInt(window.getComputedStyle(element).left, 10);
+          initialTop = parseInt(window.getComputedStyle(element).top, 10);
+          // Сохраняем данные о новом элементе
+
+          elementsData.push({
+            index: nextIndex,
+            left: initialLeft,
+            top: initialTop,
+            connection: null,
+            component: null,
+            componentResult: null,
+            componentOutput: null,
+            pointOutput: null,
+            connectionPointOutout: null,
+            pointInput: null,
+            connectionPointInput: null,
+          });
+        }
+        nextIndex++; // Увеличиваем индекс для следующего элемента
+        // Обновляем содержимое всех элементов
+        ComponentVision();
+      }
+
+      globalIndex = 0;
+
+      function createConnectionNodes(
+        indexMainElement,
+        inputNodes,
+        outputNodes
+      ) {
+        console.log("start_createConnectionNodes");
+
+        // Находим элемент на странице по индексу
+        const element = document.querySelector(
+          `.draggable-element[data-number_index="${Number(indexMainElement)}"]`
+        );
+
+        console.log("createConnectionNodes element,", element);
+
+        if (!element) {
+          console.error("Element not found");
+          return;
+        }
+
+        // Удаляем существующие узлы перед созданием новых
+        element
+          .querySelectorAll(".connection-node")
+          .forEach((node) => node.remove());
+
+        // Очистка предыдущих точек подключения для текущего элемента
+        connectionPoint = connectionPoint.filter(
+          (point) => point.indexMainElement !== indexMainElement
+        );
+
+        // Высота для распределения узлов
+        const spacingMultiplier = 28;
+
+        // Создаем массив индексов для узлов
+        const totalNodes = inputNodes + outputNodes;
+        const indices = Array.from(
+          { length: totalNodes },
+          (_, i) => globalIndex + i
+        );
+
+        // Обновляем глобальный счётчик индексов
+        globalIndex = connectionPoint.length;
+
+        // Функция для создания узла
+        function createNode(type, position, index) {
+          const node = document.createElement("div");
+          node.classList.add("connection-node");
+          node.setAttribute("type", type);
+          node.setAttribute("number_index", index);
+          node.style.position = "absolute";
+          node.style.width = "20px";
+          node.style.height = "20px";
+          node.style.borderRadius = "50%";
+          node.style.backgroundColor =
+            type === 0 ? "rgba(0, 128, 0, 0.8)" : "rgba(255, 0, 0, 0.8)";
+          node.style.border = `2px solid ${
+            type === 0 ? "rgba(0, 255, 0, 0.7)" : "rgba(255, 0, 0, 0.7)"
+          }`;
+          node.style.boxShadow = `0 0 5px ${
+            type === 0 ? "rgba(0, 255, 0, 0.5)" : "rgba(255, 0, 0, 0.5)"
+          }`;
+          node.style[type === 0 ? "left" : "right"] = "-10px";
+          node.style.top = `${spacingMultiplier * (position + 1) - 10}px`;
+
+          const img = document.createElement("img");
+          img.src = "connect.png";
+          img.style.width = "100%";
+          img.style.height = "100%";
+          img.style.borderRadius = "50%";
+          img.style.pointerEvents = "none";
+          node.appendChild(img);
+
+          element.appendChild(node);
+          getPoint(node);
+
+          // Добавляем информацию о созданном узле в массив
+          connectionPoint.push({
+            index: index,
+            indexMainElement: indexMainElement,
+            TypePont: type,
+            connection: null,
+          });
+        }
+
+        // Создаем input узлы слева
+        for (let i = 0; i < inputNodes; i++) {
+          createNode(0, i, indices[i]);
+        }
+
+        // Создаем output узлы справа
+        for (let i = 0; i < outputNodes; i++) {
+          createNode(1, i, indices[inputNodes + i]);
+        }
+
+        ComponentVision();
+      }
+
+      function getPoint(node) {
+        node.addEventListener("mouseenter", () => {
+          node.classList.add("Light");
+          //console.log(node);
+        });
+        node.addEventListener("mouseleave", () => {
+          node.classList.remove("Light");
+        });
+
+        node.addEventListener("dblclick", (e) => {
+          pointIndex = node.getAttribute("number_index");
+          pointType = node.getAttribute("type");
+
+          console.log("pointIndex", pointIndex, "pointType", pointType);
+
+          point = connectionPoint.find(
+            (e) => (e.index === Number(pointIndex)) & (e.TypePont == pointType)
+          );
+
+          mainelementPoint = elementsData.find(
+            (e) => e.index === Number(point.indexMainElement)
+          );
+
+          elementMain = document.querySelector(
+            `.draggable-element[data-number_index="${Number(
+              mainelementPoint.index
+            )}"]`
+          );
+
+          pointElement = document.querySelector(
+            `.connection-node[number_index="${Number(point.index)}"]`
+          );
+
+          console.log("pointElement", pointElement);
+
+          if (!connecting) {
+            connecting = true;
+            startElement = node;
+            //startElement.classList.add("Light_connecting");
+            line = document.createElement("div");
+            line.className = "connection-line";
+            line.classList.add("temp-connection");
+            map.appendChild(line);
+
+            startElementWidth = startElement.offsetWidth;
+            startElementHeight = startElement.offsetHeight;
+
+            elementTop = elementMain.getBoundingClientRect().top;
+
+            function getX(point, data) {
+              const style = window.getComputedStyle(point);
+              if (style.left) {
+                return data.left + parseInt(style.left) + point.offsetWidth / 2;
+              } else if (style.right) {
+                return (
+                  data.right + parseInt(style.right) + point.offsetWidth / 2
+                );
+              } else {
+                // В случае отсутствия стилей left и right можно вернуть нулевое значение или какое-то другое значение по умолчанию
+                return data.left + point.offsetWidth / 2; // предполагаем, что left равно нулю в таком случае
+              }
+            }
+
+            function getY(element, data) {
+              const style = window.getComputedStyle(element);
+              return data.top + parseInt(style.top) + element.offsetHeight / 2;
+            }
+
+            //getX(point, elementMain);
+            const x1 = getX(pointElement, elementMain);
+            const y1 = getY(pointElement, elementMain);
+            const x2 =
+              (e.clientX - map.getBoundingClientRect().left + map.scrollLeft) /
+              parseFloat(
+                getComputedStyle(map)
+                  .transform.split(",")[0]
+                  .replace("matrix(", "")
+              );
+            const y2 =
+              (e.clientY - map.getBoundingClientRect().top + map.scrollTop) /
+              parseFloat(
+                getComputedStyle(map)
+                  .transform.split(",")[0]
+                  .replace("matrix(", "")
+              );
+            updateConnectionLine(line, x1, y1, x2, y2);
+            map.addEventListener("mousemove", function (e) {
+              onMouseMove(e, pointElement, elementMain);
+            });
+
+            // Добавляем обработчики кликов для завершения соединения
+            document.querySelectorAll(".connection-node").forEach((el) => {
+              if (el !== startElement) {
+                el.addEventListener("click", finishConnection);
+                //console.log("el", el);
+              }
+            });
+          }
+        });
+      }
+
+      function updateLines() {
+        linesData.forEach((lineData) => {
+          const startConnection = connectionPoint.find(
+            (point) =>
+              point.index === lineData.startIndex.nodeindex &&
+              point.indexMainElement === lineData.startIndex.mainElement
+          );
+
+          const endConnection = connectionPoint.find(
+            (point) =>
+              point.index === lineData.endIndex.nodeindex &&
+              point.indexMainElement === lineData.endIndex.mainElement
+          );
+
+          const startElementData = elementsData.find(
+            (element) => element.index === startConnection.indexMainElement
+          );
+
+          const endElementData = elementsData.find(
+            (element) => element.index === endConnection.indexMainElement
+          );
+
+          if (startElementData && endElementData) {
+            const startElement = document.querySelector(
+              `.draggable-element[data-number_index="${startElementData.index}"] .connection-node[number_index="${startConnection.index}"]`
+            );
+            //console.log("startElement", startElement);
+            const endElement = document.querySelector(
+              `.draggable-element[data-number_index="${endElementData.index}"] .connection-node[number_index="${endConnection.index}"]`
+            );
+
+            if (startElement && endElement) {
+              // Функция для получения координаты X в зависимости от наличия стиля left или right
+              function getX(element, data) {
+                const style = window.getComputedStyle(element);
+                if (style.left) {
+                  return (
+                    data.left + parseInt(style.left) + element.offsetWidth / 2
+                  );
+                } else if (style.right) {
+                  return (
+                    data.right + parseInt(style.right) + element.offsetWidth / 2
+                  );
+                } else {
+                  // В случае отсутствия стилей left и right можно вернуть нулевое значение или какое-то другое значение по умолчанию
+                  return data.left + element.offsetWidth / 2; // предполагаем, что left равно нулю в таком случае
+                }
+              }
+
+              // Функция для получения координаты Y
+              function getY(element, data) {
+                const style = window.getComputedStyle(element);
+                return (
+                  data.top + parseInt(style.top) + element.offsetHeight / 2
+                );
+              }
+
+              const startX = getX(startElement, startElementData);
+              const startY = getY(startElement, startElementData);
+
+              const endX = getX(endElement, endElementData);
+              const endY = getY(endElement, endElementData);
+
+              updateConnectionLine(
+                lineData.lineElement,
+                startX,
+                startY,
+                endX,
+                endY
+              );
+            }
+          }
+        });
+      }
+
+      function updateConnectionLine(line, x1, y1, x2, y2) {
+        const scale = parseFloat(
+          getComputedStyle(map).transform.split(",")[0].replace("matrix(", "")
+        );
+        const width = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        line.style.width = `${width}px`;
+        line.style.height = "2px"; // Ширина линии
+        line.style.backgroundColor = "red";
+        line.style.position = "absolute"; // Убедитесь, что линия абсолютно позиционирована
+        line.style.transformOrigin = "0 0"; // Точка, от которой линия будет вращаться
+        line.style.transform = `rotate(${angle}rad)`;
+        line.style.left = `${x1}px`;
+        line.style.top = `${y1}px`;
+      }
+
+      // Обработчик движения мыши для обновления линии
+      function onMouseMove(e, pointElement, elementMain) {
+        if (line && startElement) {
+          //console.log("check");
+          const scale = parseFloat(
+            getComputedStyle(map).transform.split(",")[0].replace("matrix(", "")
+          );
+
+          function getX(point, data) {
+            const style = window.getComputedStyle(point);
+            if (style.left) {
+              return (
+                data.getBoundingClientRect().left +
+                parseInt(style.left) +
+                point.offsetWidth / 2
+              );
+            } else if (style.right) {
+              return (
+                data.getBoundingClientRect().right +
+                parseInt(style.right) +
+                point.offsetWidth / 2
+              );
+            } else {
+              // В случае отсутствия стилей left и right можно вернуть нулевое значение или какое-то другое значение по умолчанию
+              return data.getBoundingClientRect().left + point.offsetWidth / 2; // предполагаем, что left равно нулю в таком случае
+            }
+          }
+
+          function getY(element, data) {
+            const style = window.getComputedStyle(element);
+            return (
+              data.getBoundingClientRect().top +
+              parseInt(style.top) +
+              element.offsetHeight / 2
+            );
+          }
+          // console.log("pointElement", pointElement, "elementMain", elementMain);
+          const x1 =
+            getX(pointElement, elementMain) -
+            map.getBoundingClientRect().left +
+            map.scrollLeft;
+          const y1 =
+            getY(pointElement, elementMain) -
+            map.getBoundingClientRect().top +
+            map.scrollTop;
+          const x2 =
+            (e.clientX - map.getBoundingClientRect().left + map.scrollLeft) /
+            scale;
+          const y2 =
+            (e.clientY - map.getBoundingClientRect().top + map.scrollTop) /
+            scale;
+
+          updateConnectionLine(line, x1, y1, x2, y2);
+        }
+      }
+
+      // Обработка событий нажатия клавиш для предотвращения стандартного поведения
+      window.addEventListener("keydown", (e) => {
+        if (
+          e.key === " " ||
+          e.key === "ArrowUp" ||
+          e.key === "ArrowDown" ||
+          e.key === "ArrowLeft" ||
+          e.key === "ArrowRight"
+        ) {
+          e.preventDefault();
+        }
+      });
+
+      function finishConnection(e, load_line, lineElement) {
+        if (load_line == true) {
+          console.log("load_line", load, lineElement);
+          updateLines();
+        }
+
+        const element = e.currentTarget;
+        console.log(
+          "element_conect",
+          element,
+          "type",
+          element.getAttribute("type")
+        );
+        if (element.getAttribute("type") == 0) {
+          if (line) {
+            /////////
+            pointIndexForEnd = element.getAttribute("number_index");
+            pointTypeForEnd = element.getAttribute("type");
+
+            startElementWidthForEnd = element.offsetWidth;
+            startElementHeightForEnd = element.offsetHeight;
+
+            //console.log("pointIndex", pointIndex, "pointType", pointType);
+
+            pointForEnd = connectionPoint.find(
+              (e) =>
+                (e.index === Number(pointIndexForEnd)) &
+                (e.TypePont == pointTypeForEnd)
+            );
+
+            mainelementPoint = elementsData.find(
+              (e) => e.index === Number(pointForEnd.indexMainElement)
+            );
+
+            elementMainForEnd = document.querySelector(
+              `.draggable-element[data-number_index="${Number(
+                mainelementPoint.index
+              )}"]`
+            );
+
+            updateLines();
+
+            // Обновляем данные о подключении в массиве elementsData и linesData
+
+            linesData.push({
+              index: elementMain.getAttribute("data-number_index"),
+              startIndex: {
+                mainElement: Number(
+                  elementMain.getAttribute("data-number_index")
+                ),
+                nodeindex: point.index,
+              },
+              endIndex: {
+                mainElement: Number(
+                  elementMainForEnd.getAttribute("data-number_index")
+                ),
+                nodeindex: pointForEnd.index,
+              },
+              lineElement: line,
+            });
+
+            connecting = false;
+            startElement = null;
+            line = null;
+
+            elementsData[
+              Number(elementMain.getAttribute("data-number_index"))
+            ].connection = {
+              startIndex: {
+                mainElement: Number(
+                  elementMain.getAttribute("data-number_index")
+                ),
+                nodeindex: point.index,
+              },
+              endIndex: {
+                mainElement: Number(
+                  elementMainForEnd.getAttribute("data-number_index")
+                ),
+                nodeindex: pointForEnd.index,
+              },
+            };
+
+            connecting = false;
+            startElement = null;
+            line = null;
+
+            connectionPoint[
+              Number(elementMain.getAttribute("data-number_index"))
+            ].connection = {
+              startIndex: {
+                mainElement: Number(
+                  elementMain.getAttribute("data-number_index")
+                ),
+                nodeindex: point.index,
+              },
+              endIndex: {
+                mainElement: Number(
+                  elementMainForEnd.getAttribute("data-number_index")
+                ),
+                nodeindex: pointForEnd.index,
+              },
+            };
+
+            // Убираем слушатель движения мыши
+            map.removeEventListener("mousemove", onMouseMove);
+
+            // Убираем временные обработчики кликов
+            document.querySelectorAll(".connection-node").forEach((el) => {
+              el.removeEventListener("click", finishConnection);
+            });
+          }
+        }
+      }
+
+      function onRightClick(e) {
+        e.preventDefault(); // Предотвращаем открытие контекстного меню
+
+        // Проверяем, существует ли линия и нужно ли ее удалить
+        if (line) {
+          // Удаляем созданную линию
+          line.remove();
+
+          // Сбрасываем данные и состояние
+          connecting = false;
+          startElement.classList.remove("Light_connecting");
+          startElement = null;
+          line = null;
+
+          // Убираем слушатель движения мыши
+          map.removeEventListener("mousemove", onMouseMove);
+
+          // Убираем временные обработчики кликов
+          document.querySelectorAll(".draggable-element").forEach((el) => {
+            el.removeEventListener("click", finishConnection);
+          });
+        }
+      }
+
+      map.addEventListener("contextmenu", onRightClick);
+
+      function updateElementsContentText_debug() {
+        if (typeof updateText !== "undefined") {
+          clearInterval(updateText);
+        }
+        elementsData.forEach((data) => {
+          // Находим элемент с соответствующим значением data-number_index
+          const element = document.querySelector(
+            `.draggable-element[data-number_index="${data.index}"]`
+          );
+          if (element) {
+            element.innerHTML = `Индекс ${data.index}<br>Left ${data.left} Top ${data.top}<br>connection ${data.connection}<br>component ${data.component}<br>componentOutput ${data.componentOutput}`;
+
+            element.style.width = "auto"; // Сбрасываем ширину, чтобы она подстраивалась по содержимому
+            element.style.height = "auto"; // Сбрасываем высоту, чтобы она подстраивалась по содержимому
+
+            // Получаем фактические размеры элемента после установки текста
+            const newWidth = element.offsetWidth;
+            const newHeight = element.offsetHeight;
+
+            // Устанавливаем новые размеры элемента
+            element.style.width = `${newWidth}px`;
+            element.style.height = `${newHeight}px`;
+          }
+        });
+      }
+
+      function ComponentVision() {
+        /*
+        if (typeof updateText_debug !== "undefined") {
+          clearInterval(updateText_debug);
+        }
+        updateLines();
+
+        elementsData.forEach((data) => {
+          // Находим элемент с соответствующим значением data-number_index
+          const element = document.querySelector(
+            `.draggable-element[data-number_index="${data.index}"]`
+          );
+          if (element) {
+            element.innerHTML = `Индекс ${data.index}<br>componentOutput ${data.componentOutput}`;
+
+            const outputNodes = element.querySelectorAll(
+              "connection-node.output"
+            ).length;
+
+            // console.log("outputNodes", outputNodes);
+
+            element.style.width = "auto"; // Сбрасываем ширину, чтобы она подстраивалась по содержимому
+            element.style.height = "auto"; // Сбрасываем высоту, чтобы она подстраивалась по содержимому
+
+            // Получаем фактические размеры элемента после установки текста
+            const newWidth = element.offsetWidth;
+            const newHeight = element.offsetHeight;
+
+            // Устанавливаем новые размеры элемента
+            element.style.width = `${newWidth}px`;
+            element.style.height = `${newHeight}px`;
+          }
+        });
+        */
+      }
+
+      function fulfilledScript(idx) {
+        elementsData.forEach((data) => {
+          const elementHTML = document.querySelector(
+            `.draggable-element[data-number_index="${Number(idx)}"]`
+          );
+          console.log("element1", elementHTML);
+
+          elementloadScript = elementsData.find(
+            (data) => data.index === Number(idx)
+          );
+
+          console.log("elementloadScript", elementloadScript.component);
+
+          if (elementloadScript.component != null) {
+            // Ищем соответствующий скрипт в массиве savedScripts
+            const script = savedScripts.find(
+              (script) => script.name === elementloadScript.component
+            );
+
+            if (script) {
+              try {
+                // Выполняем скрипт
+                const scriptContent = script.content;
+
+                // Создаем функцию с содержимым скрипта, принимающую аргумент el
+                const executeScript = new Function("el", "idx", scriptContent);
+
+                // Выполняем функцию, передавая element как аргумент
+                elementloadScript.componentOutput = executeScript(
+                  elementHTML,
+                  idx
+                );
+              } catch (error) {
+                console.error(
+                  `Ошибка при выполнении скрипта ${elementloadScript.component}:`,
+                  error
+                );
+                elementloadScript.componentOutput = `Ошибка при выполнении скрипта: ${error.message}`;
+              }
+            } else {
+              console.warn(
+                `Скрипт с именем ${elementloadScript.component} не найден в savedScripts.`
+              );
+              elementloadScript.componentOutput = `Скрипт не найден: ${elementloadScript.component}`;
+            }
+          }
+        });
+      }
+
+      document.addEventListener("DOMContentLoaded", (event) => {
+        const slider = document.getElementById("slider");
+
+        slider.addEventListener("change", (event) => {
+          if (event.target.checked) {
+            // Whileupdate_updateElementsContentText_debug();
+          } else {
+            // Whileupdate_ComponentVision();
+          }
+        });
+      });
+
+      //#endregion
+      ////////////////////////////////////////////////// создание элемента + логика обновление дебага + свитч  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+      ////////////////////////////////////////////////// контекст меню   \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+      //#region conyext_menu
+      //TODO: conyext_menu_  контекст меню
+      const contextMenu = document.getElementById("contextMenu");
+      const dropArea = document.getElementById("dropArea");
+      const fileListElement = document.getElementById("fileList");
+
+      function showContextMenu(x, y) {
+        contextMenu.style.left = `${x}px`;
+        contextMenu.style.top = `${y}px`;
+        contextMenu.style.display = "block";
+      }
+
+      function hideContextMenu() {
+        contextMenu.style.display = "none";
+      }
+
+      document.addEventListener("click", (event) => {
+        if (
+          contextMenu.style.display === "block" &&
+          !contextMenu.contains(event.target)
+        ) {
+          hideContextMenu();
+        }
+      });
+
+      /*
+            document.addEventListener("click", () => {
+              hideContextMenu();
+            });
+      */
+      function getElement(element) {
+        if (selectedElements.length > 0) {
+          selectedElements.forEach((selectedElementAllForget) => {
+            const Sea = selectedElementAllForget.element;
+            const dataNumberIndex = Sea.dataset.number_index;
+            console.log("Выбранные элементы", dataNumberIndex);
+          });
+          /*
+                selectedElements.forEach((selectedElementAll) => {
+                    const Sea = selectedElementAll.element;
+                    const dataNumberIndex = Sea.dataset.number_index;
+
+                    const initialLeft = parseInt(Sea.style.left || 0, 10);
+                    const initialTop = parseInt(Sea.style.top || 0, 10);
+
+                    initialPositions[dataNumberIndex] = {
+                      left: initialLeft,
+                      top: initialTop,
+                    };
+      */
+        } else {
+          console.log("Выбранный элемент", element.dataset.number_index);
+          getElementobject_index = element.dataset.number_index;
+        }
+      }
+
+      document
+        .getElementById("chooseComponentBtn")
+        .addEventListener("click", () => {
+          console.log("модальное окно", savedScripts);
+
+          if (savedScripts.length > 0) {
+            console.log("модальное окно_открытие");
+
+            const fileModal = document.getElementById("fileModal");
+            const fileIconsContainer = document.getElementById("fileIcons");
+            fileModal.style.display = "block";
+
+            // Очистка предыдущих иконок, если они есть
+            fileIconsContainer.innerHTML = "";
+
+            // Создание иконок для каждого файла в массиве savedScripts
+            savedScripts.forEach((script, index) => {
+              const fileIcon = document.createElement("div");
+              fileIcon.className = "file-icon";
+
+              const img = document.createElement("img");
+              img.src = "1.png"; // Замените на путь к вашей иконке файла
+
+              const fileName = document.createElement("p");
+              fileName.textContent = script.name;
+
+              // Добавляем иконку и название файла в контейнер
+              fileIcon.appendChild(img);
+              fileIcon.appendChild(fileName);
+              fileIconsContainer.appendChild(fileIcon);
+
+              // Добавляем обработчик события для клика на иконку файла
+              fileIcon.addEventListener("click", () => {
+                hideContextMenu();
+                console.log("selectedElements", selectedElements);
+                updateElementComponent(script);
+                console.log(`Выбран файл: ${script.name}`);
+                console.log(`Содержимое файла: ${script.content}`);
+                // Закрываем модальное окно
+                fileModal.style.display = "none";
+              });
+            });
+          }
+        });
+
+      function updateElementComponent(component) {
+        if (selectedElements.length > 0) {
+        } else {
+          console.log("передаваемый скрипт", component);
+          console.log("getElementobject", getElementobject_index);
+          console.log("elementsData", elementsData);
+          const elementData_object = elementsData.find(
+            (e) => e.index === Number(getElementobject_index)
+          );
+          console.log("elementData_object", elementData_object);
+
+          if (elementData_object) {
+            elementData_object.component = component.name;
+          }
+          fulfilledScript(elementData_object.index);
+        }
+
+        /*
+              const index = parseInt(element.dataset.index);
+
+              if (elementData) {
+                elementData.component = component;
+                console.log(`Обновлены данные элемента ${index}:`, elementData);
+              }
+                */
+      }
+
+      // Закрытие модального окна при нажатии на X
+      document.querySelector(".close").addEventListener("click", () => {
+        document.getElementById("fileModal").style.display = "none";
+      });
+
+      // Закрытие модального окна при клике вне его
+      window.addEventListener("click", (event) => {
+        const fileModal = document.getElementById("fileModal");
+        if (event.target === fileModal) {
+          fileModal.style.display = "none";
+        }
+      });
+
+      document.getElementById("clearStorage").addEventListener("click", () => {
+        // Очистка локального хранилища
+        localStorage.removeItem("savedScripts");
+
+        // Очистка списка скриптов на странице
+        fileListElement.innerHTML = "";
+
+        // Очистка массива сохраненных скриптов
+        savedScripts = [];
+      });
+
+      window.addEventListener("load", () => {
+        const savedData = localStorage.getItem("savedScripts");
+        if (savedData) {
+          savedScripts = JSON.parse(savedData);
+          savedScripts.forEach((script) => {
+            const listItem = document.createElement("li");
+            listItem.textContent = script.name;
+            fileListElement.appendChild(listItem);
+          });
+        }
+      });
+
+      dropArea.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        dropArea.classList.add("dragover");
+      });
+
+      dropArea.addEventListener("dragleave", () => {
+        dropArea.classList.remove("dragover");
+      });
+
+      dropArea.addEventListener("drop", (event) => {
+        event.preventDefault();
+        dropArea.classList.remove("dragover");
+
+        const files = event.dataTransfer.files;
+        for (const file of files) {
+          const fileExtension = file.name.split(".").pop().toLowerCase();
+          const fileType = file.type.toLowerCase();
+
+          // Проверяем тип файла и расширение
+          if (
+            fileExtension === "js" ||
+            fileType === "text/javascript" ||
+            fileType === "application/javascript"
+          ) {
+            const listItem = document.createElement("li");
+            listItem.textContent = file.name;
+            fileListElement.appendChild(listItem);
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              // Сохранение содержимого файла
+              const scriptContent = e.target.result;
+              savedScripts.push({ name: file.name, content: scriptContent });
+
+              // Обновление localStorage
+              localStorage.setItem(
+                "savedScripts",
+                JSON.stringify(savedScripts)
+              );
+            };
+            reader.readAsText(file);
+          } else {
+            alert("Разрешены только файлы JavaScript.");
+          }
+        }
+      });
+
+      //#endregion
+      ////////////////////////////////////////////////// контекст меню   \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+      ////////////////////////////////////////////////// перетаскивание элемента + обработка линий + логика выбора элемента   \\\\\\\\\\\\\\
+      //#region task element_lines update_select element
+      //TODO: task element_lines update_select element_  перетаскивание элемента + обработка линий + логика выбора элемента
+
+      function makeElementDraggable(element) {
+        element.addEventListener("mousedown", (e) => {
+          // updateElementsContentText_debug();
+          getElement(element);
+          element.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            selectedElement = element;
+            showContextMenu(e.clientX, e.clientY);
+          });
+
+          if (selectedElements != null) {
+            selectedElements.forEach((selectedElementAll) => {
+              const Sea = selectedElementAll.element;
+              const dataNumberIndex = Sea.dataset.number_index;
+
+              const initialLeft = parseInt(Sea.style.left || 0, 10);
+              const initialTop = parseInt(Sea.style.top || 0, 10);
+
+              initialPositions[dataNumberIndex] = {
+                left: initialLeft,
+                top: initialTop,
+              };
+            });
+          }
+
+          selectedElement = element;
+          isDraggingElement = true;
+          isDraggingMap = false;
+          startX = e.clientX;
+          startY = e.clientY;
+          console.log('startX',startX,'startY',startY)
+          initialLeft = parseInt(window.getComputedStyle(element).left, 10);
+          initialTop = parseInt(window.getComputedStyle(element).top, 10);
+          e.stopPropagation(); // Предотвращение захвата события картой
+        });
+
+        element.addEventListener("mouseup", (e) => {
+          isDraggingElement = false;
+        });
+
+        element.addEventListener("mousemove", (e) => {
+          // updateElementsContentText_debug();
+          isDraggingMap = false;
+          if (isDraggingElement) {
+            e.preventDefault();
+            const scale = parseFloat(
+              getComputedStyle(map)
+                .transform.split(",")[0]
+                .replace("matrix(", "")
+            );
+            const x = e.clientX;
+            const y = e.clientY;
+
+            const deltaX = (x - startX) * scale;
+            const deltaY = (y - startY) * scale;
+            console.log('x_del',deltaX,'y_del',deltaY)
+
+            if (selectedElements != null) {
+              console.log(1)
+              selectedElements.forEach((selectedElementAll) => {
+                const Sea = selectedElementAll.element;
+                const dataNumberIndex = Sea.dataset.number_index;
+                const matchingElement = document.querySelector(
+                  `.draggable-element[data-number_index="${dataNumberIndex}"]`
+                );
+
+                if (matchingElement) {
+                  const initialPosition = initialPositions[dataNumberIndex];
+                  if (initialPosition) {
+                    const newLeft = initialPosition.left + deltaX;
+                    const newTop = initialPosition.top + deltaY;
+
+                    matchingElement.style.left = `${newLeft}px`;
+                    matchingElement.style.top = `${newTop}px`;
+                    /*
+                          console.log(
+                            "установленные координаты",
+                            matchingElement.style.left,
+                            matchingElement.style.top
+                          );
+      */
+                    const index = elementsData.findIndex(
+                      (e) => e.index === parseInt(matchingElement.dataset.index)
+                    );
+                    if (index !== -1) {
+                      elementsData[index].left = newLeft;
+                      elementsData[index].top = newTop;
+                    }
+                  }
+                } else {
+                  console.error(
+                    `Element with data-number_index="${dataNumberIndex}" not found`
+                  );
+                }
+              });
+            } else {
+              
+              const initialLeft = parseInt(selectedElement.style.left, 10);
+              const initialTop = parseInt(selectedElement.style.top, 10);
+
+              console.log('initialLeft',initialLeft,'initialTop',initialTop)
+
+              selectedElement.style.left = `${initialLeft + deltaX}px`;
+              selectedElement.style.top = `${initialTop + deltaY}px`;
+
+              console.log(selectedElement.style.left, selectedElement.style.top)
+
+              // Обновляем данные о элементе в массиве
+              const index = elementsData.findIndex(
+                (e) => e.index === parseInt(selectedElement.dataset.index)
+              );
+              if (index !== -1) {
+                elementsData[index].left = parseInt(
+                  selectedElement.style.left,
+                  10
+                );
+                elementsData[index].top = parseInt(
+                  selectedElement.style.top,
+                  10
+                );
+              }
+            }
+          }
+          updateLines();
+          ComponentVision();
+        });
+
+        element.dataset.index = nextIndex;
+
+        element.addEventListener("mouseenter", () => {
+          if (!isDraggingElement && !isDraggingMap) {
+           // element.classList.add("highlight");
+          }
+        });
+
+        element.addEventListener("mouseleave", () => {
+          //element.classList.remove("highlight");
+        });
+      }
+
+      //#endregion
+      ////////////////////////////////////////////////// перетаскивание элемента + обработка линий + логика выбора элемента   \\\\\\\\\\\\\\
+
+      ////////////////////////////////////////////////// логика кнопок сохранить, добавить  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+      //#region save_add
+      //TODO: save_add_  логика кнопок сохранить, добавить
+
+      const saveScenarioBtn = document.getElementById("saveScenarioBtn");
+      const loadScenarioBtn = document.getElementById("loadScenarioBtn");
+      const fileInput = document.getElementById("fileInput");
+
+      // Сохранение данных в JSON-файл
+      saveScenarioBtn.addEventListener("click", () => {
+        const dataToSave = {
+          elements: elementsData,
+          lines: linesData,
+        };
+
+        // Формируем JSON-файл
+        const jsonContent = JSON.stringify(dataToSave, null, 2);
+        const blob = new Blob([jsonContent], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+
+        // Создаем ссылку и скачиваем файл
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", "scenario.json");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      });
+      // Загрузка данных из CSV-файла
+      loadScenarioBtn.addEventListener("click", () => {
+        fileInput.click();
+      });
+
+      fileInput.addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              // Парсим JSON из содержимого файла
+              const contents = e.target.result.trim();
+              const data = JSON.parse(contents);
+
+              // Проверяем, что структура данных правильная
+              if (data.elements && data.lines) {
+                elementsData = data.elements;
+                linesData = data.lines;
+
+                console.debug(
+                  `Загруженные элементы: ${JSON.stringify(elementsData)}`
+                );
+                console.debug(
+                  `Загруженные соединения: ${JSON.stringify(linesData)}`
+                );
+
+                // Создаем элементы для каждого элемента данных
+                elementsData.forEach((element) => {
+                  createElement(true, element.index);
+                });
+
+                // Создаем визуальные элементы для линий и добавляем их в массив
+                linesData.forEach((lineData) => {
+                  // Создаем элемент линии
+                  const lineElement = document.createElement("div");
+                  lineElement.classList.add("connection-line");
+                  map.appendChild(lineElement);
+                  // Присваиваем lineElement в объект линии
+                  lineData.lineElement = lineElement;
+                });
+
+                // Обновляем линии после того, как все линии созданы
+                updateLines();
+              } else {
+                console.error(
+                  "Файл не содержит ожидаемых данных: 'elements' или 'lines'."
+                );
+              }
+            } catch (error) {
+              console.error(
+                "Ошибка при парсинге или обработке данных из файла:",
+                error
+              );
+            }
+          };
+          reader.readAsText(file);
+        }
+      });
+
+      //#endregion
+      ////////////////////////////////////////////////// логика кнопок сохранить, добавить  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+    </script>
+  </body>
+</html>

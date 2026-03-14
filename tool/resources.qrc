@@ -1,0 +1,8 @@
+<RCC>
+    <qresource prefix="/plugins/gpzuTools" >
+        <file>icon.png</file>
+        <file>upload.svg</file>
+        <file>download.svg</file>
+        <file>setup.svg</file>
+    </qresource>
+</RCC>

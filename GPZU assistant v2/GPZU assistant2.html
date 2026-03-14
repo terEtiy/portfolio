@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GPZU assistant</title>
+    <style>
+      /* Удаление отступов и более современный выбор шрифта */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+        font-family: 'Josefin Sans', sans-serif;
+      }
+      
+      .container-fluid {
+        position: relative;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        display: contents;
+      }
+
+      .background {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(132deg, #FC415A, #591BC5, #212335);
+        background-size: 400% 400%;
+        animation: Gradient 15s ease infinite;
+        z-index: -1;
+        overflow: hidden;
+      }
+      
+      .cube {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        border: solid 1px #ffffff;
+        transform-origin: top left;
+        transform: scale(0) rotate(0deg) translate(-50%, -50%);
+        animation: cube 18s cubic-bezier(0.75, 0.03, 1, 1) forwards infinite;
+      }
+      
+      /* Настройки анимации для кубов */
+      .cube:nth-child(1) {
+        animation-delay: 2s;
+        left: 15vw;
+        top: 17vh;
+      }
+      .cube:nth-child(2) {
+        animation-delay: 2s;
+        left: 25px;
+        top: 40vh;
+      }
+      .cube:nth-child(3) {
+        animation-delay: 4s;
+        left: 75vw;
+        top: 50vh;
+      }
+      .cube:nth-child(4) {
+        animation-delay: 6s;
+        left: 90vw;
+        top: 10vh;
+      }
+      .cube:nth-child(5) {
+        animation-delay: 8s;
+        left: 10vw;
+        top: 85vh;
+      }
+      .cube:nth-child(6) {
+        animation-delay: 10s;
+        left: 50vw;
+        top: 10vh;
+      }
+		
+	  .cube:nth-child(7) {
+        animation-delay: 12s;
+        left: 91vw;
+        top: 70vh;
+      }
+      .cube:nth-child(8) {
+        animation-delay: 14s;
+        left: 5vw;
+        top: 60vh;
+      }
+      .cube:nth-child(9) {
+        animation-delay: 16s;
+        left: 70vw;
+        top: 90vh;
+      }
+      .cube:nth-child(10) {
+        animation-delay: 18s;
+        left: 2000vw;
+        top: 110vh;
+      }	  
+		
+      .container {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+        padding: 40px;
+        max-width: 600px;
+        width: 100%;
+        text-align: center;
+        z-index: 1;
+      }
+      
+      .container h1 {
+        font-size: 2rem;
+        margin-bottom: 1.5rem;
+        color: #222;
+      }
+      
+      .container a {
+        display: block;
+        background: #1e90ff;
+        color: white;
+        text-decoration: none;
+        padding: 15px;
+        border-radius: 8px;
+        font-size: 1rem;
+        margin-bottom: 15px;
+        transition: transform 0.3s, background-color 0.3s;
+      }
+      
+      .container a:hover {
+        background-color: #4682b4;
+        transform: translateY(-2px);
+      }
+
+      /* Анимация фона */
+      @keyframes Gradient {
+        0% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+        100% {
+          background-position: 0% 50%;
+        }
+      }
+
+      /* Анимация для кубов */
+      @keyframes cube {
+        from {
+          transform: scale(0) rotate(0deg) translate(-50%, -50%);
+          opacity: 1;
+        }
+        to {
+          transform: scale(20) rotate(960deg) translate(-50%, -50%);
+          opacity: 0;
+        }
+      }
+    </style>
+  </head>
+  
+  <body>
+    <div class="container-fluid">
+      <!-- Анимация фона -->
+      <div class="background">
+        <div class="cube"></div>
+        <div class="cube"></div>
+        <div class="cube"></div>
+        <div class="cube"></div>
+        <div class="cube"></div>
+        <div class="cube"></div>
+        <div class="cube"></div>
+        <div class="cube"></div>
+        <div class="cube"></div>
+        <div class="cube"></div>
+      </div>
+
+	  <div class="container">
+		<h1>GPZU assistant</h1>
+		<a href="data/generator.html">Генератор готовых ограничений</a>
+		<a href="data/edit_db.html">Редактировать БД</a>
+		<a href="data/PPT_editor_v02.html">Сравнить растры</a>
+		<a href="data/Извлечение координат из XML ЗУ.html">Извлечение координат ограничений из XML ЗУ</a>
+		<a href="data/xml Parser_automatzate.html">Извлечение данных из XML ОКС</a>
+		<a href="data/xml Parser_syhodrochka.html">Извлечение данных из XML по <Тэгам></a>
+		<a href="data/PDF to JPG Converter.html">Конвертировать PDF в JPG</a>
+    <a href="data/2.3 generator.html">Генератор для 2 раздела</a>
+    <a href="data/node_v3.html">node_v3_alfa</a>
+    <a href="data/AST.html">AST visitor JS</a>
+	  </div>
+
+	</body>
+	</html>

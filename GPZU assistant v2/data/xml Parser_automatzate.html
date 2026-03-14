@@ -1,0 +1,863 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <title>XML to Table</title>
+    <style>
+      body {
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        background-color: #f4f4f9;
+        margin: 0;
+        padding: 20px;
+        color: #333;
+      }
+      .invisible-hover-area {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 300px; /* Увеличенный размер по ширине */
+        height: 100px; /* Увеличенный размер по высоте */
+        z-index: 999; /* Обеспечиваем, что этот div будет перед другими элементами */
+      }
+
+      .invisible-hover-area:hover .exit-button {
+        transform: translateX(310px) scale(1.05);
+        background-color: #0056b3;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      }
+
+      .exit-button {
+        display: inline-block;
+        padding: 12px 24px;
+        background-color: #007bff;
+        color: white;
+        text-decoration: none;
+        border-radius: 25px;
+        font-size: 16px;
+        font-weight: bold;
+        position: fixed;
+        top: 20px;
+        left: -300px;
+        z-index: 1000;
+        transition: transform 0.4s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+        transform: translateX(110px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      }
+
+      .exit-button:active {
+        transform: translateX(310px) scale(0.95);
+        background-color: #00408f;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      }
+
+      h1 {
+        text-align: center;
+        color: #444;
+        margin-bottom: 40px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+        background-color: #fff;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      caption {
+        font-size: 24px;
+        font-weight: bold;
+        padding: 10px;
+        background-color: #444;
+        color: white;
+        text-align: left;
+      }
+
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 12px;
+        text-align: center;
+      }
+
+      th {
+        background-color: #f0f0f0;
+      }
+
+      tr:hover {
+        background-color: #f7f7f7;
+      }
+
+      button {
+        display: block;
+        margin: 20px auto;
+        padding: 12px 24px;
+        font-size: 16px;
+        background-color: #444;
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 8px;
+        transition: background-color 0.3s;
+      }
+
+      button:disabled {
+        background-color: #aaa;
+        cursor: not-allowed;
+      }
+
+      button:hover:enabled {
+        background-color: #333;
+      }
+
+      #copyButton,
+      #copyButton_construct,
+      #copyButton_ONS,
+      #download-csv1,
+      #download-csv2 {
+        display: none;
+      }
+
+      @media (max-width: 768px) {
+        table,
+        th,
+        td {
+          font-size: 14px;
+        }
+
+        caption {
+          font-size: 20px;
+        }
+
+        button {
+          padding: 10px 20px;
+        }
+      }
+      .button_con {
+        display: flex;
+        justify-content: center; /* Или можно использовать flex-start, flex-end, center, space-around */
+      }
+
+      button {
+        margin: 15px; /* Добавляет небольшое пространство между кнопками */
+      }
+      .file-upload-container {
+        position: relative;
+        width: 98%;
+        padding: 20px;
+        border: 2px dashed #007bff;
+        border-radius: 10px;
+        background-color: #fff;
+        text-align: center;
+        transition: border-color 0.3s;
+        margin-bottom: 30px;
+        display: inline-grid;
+        align-items: baseline;
+        justify-content: center;
+        justify-items: stretch;
+        align-content: space-evenly;
+      }
+
+      .file-upload-container:hover {
+        border-color: #0056b3;
+      }
+
+      .file-input {
+        display: none;
+      }
+
+      .file-label {
+        display: inline-block;
+        padding: 20px 40px;
+        color: #007bff;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        border: 2px solid #007bff;
+        border-radius: 5px;
+        background-color: #fff;
+        transition: background-color 0.3s, color 0.3s;
+      }
+
+      .file-label:hover {
+        background-color: #007bff;
+        color: #fff;
+      }
+
+      .file-label-text {
+        pointer-events: none;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- Кнопка выхода на основную страницу -->
+    <div class="invisible-hover-area">
+      <a href="../GPZU assistant.html" class="exit-button">Перейти на главную</a>
+    </div>
+
+    <h1>Данные из XML</h1>
+
+    <div class="file-upload-container" id="drop-zone">
+      <input type="file" id="fileInput" class="file-input" accept=".xml" multiple />
+      <label for="fileInput" class="file-label" id="file-label">
+        <span class="file-label-text">Перетащите XML файлы ОКС сюда или нажмите для выбора</span>
+      </label>
+    </div>
+
+    <div class="button_con">
+      <button id="copyButton" onclick="copyTable()">Скопировать данные из таблицы</button>
+      <button id="download-csv1">Скачать координаты центральных точек и wkt</button>
+      <button id="download-csv2">Скачать данные ОКС без координат</button>
+    </div>
+    <table id="dataTable">
+      <caption>
+        Здания
+      </caption>
+      <thead>
+        <tr>
+          <th>№</th>
+          <th>Кадастровый номер</th>
+          <th>Регистрационный номер</th>
+          <th>Дата</th>
+          <th>Адрес</th>
+          <th>Площадь</th>
+          <th>Назначение</th>
+          <th>Наименование</th>
+          <th>Количество этажей</th>
+          <th>Количество подземных этажей</th>
+          <th>Материал стен</th>
+          <th>Год ввода в эксплуатацию</th>
+          <th>Год постройки</th>
+          <th>Имя файла</th>
+          <th>Статус</th>
+          <th>Координаты</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <table id="dataTable_construct">
+      <caption>
+        Сооружения
+      </caption>
+      <thead>
+        <tr>
+          <th>№</th>
+          <th>Кадастровый номер</th>
+          <th>Регистрационный номер</th>
+          <th>Дата</th>
+          <th>Адрес</th>
+          <th>Площадь</th>
+          <th>Площадь застройки</th>
+          <th>Объем</th>
+          <th>Назначение</th>
+          <th>Наименование</th>
+          <th>Количество этажей</th>
+          <th>Количество подземных этажей</th>
+          <th>Материал стен</th>
+          <th>Год ввода в эксплуатацию</th>
+          <th>Год постройки</th>
+          <th>Имя файла</th>
+          <th>Статус</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <table id="dataTable_ONS">
+      <caption>
+        ОНС
+      </caption>
+
+      <thead>
+        <tr>
+          <th>№</th>
+          <th>Кадастровый номер</th>
+          <th>Регистрационный номер</th>
+          <th>Дата</th>
+          <th>Адрес</th>
+          <th>Площадь застройки</th>
+          <th>Назначение</th>
+          <th>Имя файла</th>
+          <th>Статус</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <table id="dataTable_Room">
+      <caption>
+        Помещения
+      </caption>
+
+      <thead>
+        <tr>
+          <th>№</th>
+          <th>Кадастровый номер</th>
+          <th>Регистрационный номер</th>
+          <th>Дата</th>
+          <th>Адрес</th>
+          <th>Назначение</th>
+          <th>Имя файла</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <script>
+      const fileInput = document.getElementById("fileInput");
+      const dropZone = document.getElementById("drop-zone");
+      const fileLabelText = document.querySelector(".file-label-text");
+
+      function updateFileLabelText() {
+        if (fileInput.files.length > 0) {
+          fileLabelText.textContent = `${fileInput.files.length} файл(ов) выбрано`;
+        } else {
+          fileLabelText.textContent = "Перетащите XML файлы ОКС сюда или нажмите для выбора";
+        }
+      }
+
+      dropZone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        dropZone.classList.add("dragover");
+      });
+
+      dropZone.addEventListener("dragleave", () => {
+        dropZone.classList.remove("dragover");
+      });
+
+      dropZone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        dropZone.classList.remove("dragover");
+        handleFiles(event.dataTransfer.files); // Передаем files напрямую
+      });
+
+      fileInput.addEventListener("change", (event) => {
+        handleFiles(event.target.files); // Передаем files напрямую
+      });
+
+      function handleFiles(files) {
+        updateFileLabelText();
+        const tableBody = document.getElementById("dataTable").querySelector("tbody");
+        const tableBody_construct = document.getElementById("dataTable_construct").querySelector("tbody");
+        const tableBody_ONS = document.getElementById("dataTable_ONS").querySelector("tbody");
+        const tableBody_Room = document.getElementById("dataTable_Room").querySelector("tbody");
+        tableBody.innerHTML = ""; // Очистить таблицу перед добавлением новых данных
+        tableBody_construct.innerHTML = ""; // Очистить таблицу перед добавлением новых данных
+        tableBody_ONS.innerHTML = ""; // Очистить таблицу перед добавлением новых данных
+        tableBody_Room.innerHTML = ""; // Очистить таблицу перед добавлением новых данных
+
+        Array.from(files).forEach((file) => {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            const parser = new DOMParser();
+            const xml = parser.parseFromString(e.target.result, "text/xml");
+            processXML(xml, tableBody, tableBody_construct, tableBody_ONS, tableBody_Room, file.name);
+          };
+          reader.readAsText(file);
+        });
+      }
+
+      let index = 0;
+      let index_construction = 0;
+      let index_ONS = 0;
+      let index_Room = 0;
+
+      async function processXML(xml, tableBody, tableBody_construct, tableBody_ONS, tableBody_Room, fileName) {
+        const buildRecords = xml.getElementsByTagName("build_record");
+        const buildRecords_construction = xml.getElementsByTagName("construction_record");
+        const buildRecords_ONS = xml.getElementsByTagName("object_under_construction_record");
+        const buildRecords_Room = xml.getElementsByTagName("extract_about_property_room");
+
+        for (let record of buildRecords) {
+          const cadNum = getTextContent(record, "cad_number", "common_data");
+          const regNum = getTextContent(xml, "registration_number", "group_top_requisites");
+          const date = getTextContent(xml, "date_formation", "group_top_requisites");
+          const address = getTextContent(record, "readable_address", "address");
+          const area = getTextContent(record, "area", "params");
+          const purpose = getTextContent(record, "value", "purpose");
+          const floors = getTextContent(record, "floors", "params");
+          const unfloors = getTextContent(record, "underground_floors", "params");
+          const material = getTextContent(record, "material", "params");
+          const year = getTextContent(record, "year_commisioning", "params");
+          const yearbuild = getTextContent(record, "year_built", "params");
+          const name = getTextContent(record, "name", "params");
+          const status = getTextContent(xml, "status", "extract_about_property_build");
+          koordinate_stat = getTextContent(record, "sk_id", "contours");
+          const type = "Здание";
+
+          var resarraycentroid = await arraycentroid(xml, cadNum, address, status, type);
+          console.log(cadNum);
+          console.log(resarraycentroid);
+
+          index++;
+
+          const row = document.createElement("tr");
+          row.innerHTML = `
+		    <td>${index}</td>
+				<td>${cadNum}</td>
+				<td>${regNum}</td>
+				<td>${date}</td>
+				<td>${address}</td>
+				<td>${area}</td>
+				<td>${purpose}</td>
+				<td>${name}</td>
+				<td>${floors}</td>
+				<td>${unfloors}</td>
+				<td>${material}</td>
+				<td>${year}</td>
+				<td>${yearbuild}</td>
+				<td>${fileName}</td>
+				<td>${status}</td>
+				<td>${koordinate_stat}</td>
+`;
+          tableBody.appendChild(row);
+        }
+
+        for (let record of buildRecords_construction) {
+          const cadNum_construction = getTextContent(record, "cad_number", "common_data");
+          const regNum_construction = getTextContent(xml, "registration_number", "group_top_requisites");
+          const date_construction = getTextContent(xml, "date_formation", "group_top_requisites");
+          const address_construction = getTextContent(record, "readable_address", "address");
+          const area_construction = getTextContent(record, "area", "params");
+          const area_zasrt_construction = getTextContent(record, "built_up_area", "params");
+          const volme_zasrt_construction = getTextContent(record, "volume", "base_parameters");
+          const purpose_construction = getTextContent(record, "purpose", "params");
+          const floors_construction = getTextContent(record, "floors", "params");
+          const unfloors_construction = getTextContent(record, "underground_floors", "params");
+          const material_construction = getTextContent(record, "material", "params");
+          const year_construction = getTextContent(record, "year_commisioning", "params");
+          const yearbuild_construction = getTextContent(record, "year_built", "params");
+          const name_construction = getTextContent(record, "name", "params");
+          const status_construction = getTextContent(xml, "status", "extract_about_property_construction") + " Сооружение";
+          const type = "Сооружение";
+
+          var resarraycentroid = await arraycentroid(xml, cadNum_construction, address_construction, status_construction, type);
+          console.log(cadNum_construction);
+          console.log(resarraycentroid);
+
+          index_construction++;
+
+          const row = document.createElement("tr");
+          row.innerHTML = `
+		    <td>${index_construction}</td>
+        <td>${cadNum_construction}</td>
+        <td>${regNum_construction}</td>
+		    <td>${date_construction}</td>
+        <td>${address_construction}</td>
+        <td>${area_construction}</td>
+		    <td>${area_zasrt_construction}</td>
+        <td>${volme_zasrt_construction}</td>
+        <td>${purpose_construction}</td>
+		    <td>${name_construction}</td>
+        <td>${floors_construction}</td>
+		    <td>${unfloors_construction}</td>
+        <td>${material_construction}</td>
+        <td>${year_construction}</td>
+		    <td>${yearbuild_construction}</td>
+		    <td>${fileName}</td>
+		    <td>${status_construction}</td>`;
+          tableBody_construct.appendChild(row);
+        }
+
+        for (let record of buildRecords_ONS) {
+          const cadNum_ONS = getTextContent(record, "cad_number", "common_data");
+          const regNum_ONS = getTextContent(xml, "registration_number", "group_top_requisites");
+          const date_ONS = getTextContent(xml, "date_formation", "group_top_requisites");
+          const address_ONS = getTextContent(record, "readable_address", "address");
+          const area_ONS = getTextContent(record, "built_up_area", "params");
+          const purpose_ONS = getTextContent(record, "value", "purpose");
+          const status_ONS = getTextContent(xml, "status", "extract_about_property_under_construction");
+          index_ONS++;
+
+          const row = document.createElement("tr");
+          row.innerHTML = `
+		    <td>${index_ONS}</td>
+                    <td>${cadNum_ONS}</td>
+                    <td>${regNum_ONS}</td>
+		    <td>${date_ONS}</td>
+                    <td>${address_ONS}</td>
+                    <td>${area_ONS}</td>
+                    <td>${purpose_ONS}</td>
+		    <td>${fileName}</td>
+		    <td>${status_ONS}</td>`;
+          tableBody_ONS.appendChild(row);
+        }
+
+        for (let record of buildRecords_Room) {
+          const cadNum_Room = getTextContent(record, "cad_number", "common_data");
+          const regNum_Room = getTextContent(xml, "registration_number", "group_top_requisites");
+          const date_Room = getTextContent(xml, "date_formation", "group_top_requisites");
+          const address_Room = getTextContent(record, "readable_address", "address");
+          const purpose_Room = getTextContent(record, "value", "purpose");
+          index_Room++;
+
+          const row = document.createElement("tr");
+          row.innerHTML = `
+		    <td>${index_Room}</td>
+                    <td>${cadNum_Room}</td>
+                    <td>${regNum_Room}</td>
+		    <td>${date_Room}</td>
+                    <td>${address_Room}</td>
+                    <td>${purpose_Room}</td>
+		    <td>${fileName}</td>`;
+          tableBody_Room.appendChild(row);
+        }
+
+        if (buildRecords.length > 0) {
+          document.getElementById("copyButton").style.display = "block";
+          document.getElementById("download-csv1").style.display = "block";
+          document.getElementById("download-csv2").style.display = "block";
+        }
+      }
+
+      let resultArray = [];
+      let resultnotCor = [];
+
+      function convertToCSV2(array) {
+        // Создаем заголовок CSV строки
+        const header = "cad_number;x;y;adress;type;status;wktGeom";
+
+        // Преобразуем каждый объект в строку CSV формата
+        const rows = array.map((obj) => {
+          // Получаем значения свойств address и cad_number
+          let address = obj.address.replace(/,/g, ""); // заменяем запятые в адресе, чтобы они не влияли на разделение CSV
+          let cad_number = obj.cad_number;
+          let status = obj.status.replace(/,/g, ""); // заменяем запятые в адресе, чтобы они не влияли на разделение CSV;
+          let number = obj.number;
+          let wkt = obj.wktGeom;
+          let type = obj.type;
+
+          // Получаем значения свойств x и y (если они есть)
+          let x = obj.center ? obj.center.x : "";
+          let y = obj.center ? obj.center.y : "";
+
+          // Собираем строку CSV для текущего объекта
+          return `${cad_number};${x};${y};${address};${type};${status};${wkt}`;
+        });
+
+        // Возвращаем полную CSV строку, включая заголовок
+        return `${header}\n${rows.join("\n")}`;
+      }
+
+      // Функция для конвертации массива объектов в CSV строку
+      function convertToCSV(array) {
+        const header = Object.keys(array[0]).join(",");
+        const rows = array.map((obj) => Object.values(obj).join(",")).join("\n");
+        return `${header}\n${rows}`;
+      }
+
+      // Функция для создания и скачивания CSV файла
+      function downloadCSV(csv, filename) {
+        const csvFile = new Blob([csv], { type: "text/csv" });
+        const downloadLink = document.createElement("a");
+        downloadLink.download = filename;
+        downloadLink.href = window.URL.createObjectURL(csvFile);
+        downloadLink.style.display = "none";
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+      }
+
+      // Обработчики событий для кнопок скачивания CSV
+      document.getElementById("download-csv1").addEventListener("click", function () {
+        const csv1 = convertToCSV2(resultArray);
+        downloadCSV(csv1, "Координаты центральных точек.csv");
+      });
+
+      document.getElementById("download-csv2").addEventListener("click", function () {
+        const csv2 = convertToCSV(resultnotCor);
+        downloadCSV(csv2, "Данные ОКС без координат.csv");
+      });
+
+      async function processPolygons(resextractCoordinates, status, type) {
+        console.log("resextractCoordinates", resextractCoordinates);
+        const extractedData = resextractCoordinates;
+
+        extractedData.forEach((item, index) => {
+          //console.log(item.coordinates)
+          if (item.coordinates && item.coordinates.length > 0) {
+            const centroid = calculateCentroid(item.coordinates);
+            const wkt = wktGenerate(item.coordinates);
+            resultArray.push({
+              number: index + 1,
+              center: centroid,
+              cad_number: item.cadNum,
+              address: item.address,
+              type: type,
+              status: status,
+              wktGeom: wkt,
+            });
+          } else {
+            resultnotCor.push({
+              cad_number: item.cadNum,
+              address: item.address,
+            });
+          }
+        });
+
+        return { resultArray, resultnotCor };
+      }
+
+      function calculateCentroid(coordinates) {
+        // Функция для вычисления площади полигона с использованием метода площадей треугольников
+        function calculateArea(vertices) {
+          let area = 0.0;
+          const n = vertices.length;
+
+          for (let i = 0; i < n; i++) {
+            const current = vertices[i];
+            const next = vertices[(i + 1) % n];
+            area += current.x * next.y - current.y * next.x;
+          }
+
+          area = Math.abs(area / 2);
+          return area;
+        }
+
+        // Функция для вычисления центроида полигона
+        function calculatePolygonCentroid(polygon) {
+          let centroid = { x: 0, y: 0 };
+          const n = polygon.length;
+          let signedArea = 0;
+
+          for (let i = 0; i < n; i++) {
+            const current = polygon[i];
+            const next = polygon[(i + 1) % n];
+            const areaFactor = current.x * next.y - next.x * current.y;
+            signedArea += areaFactor;
+            centroid.x += (current.x + next.x) * areaFactor;
+            centroid.y += (current.y + next.y) * areaFactor;
+          }
+
+          signedArea /= 2;
+          centroid.x /= 6 * signedArea;
+          centroid.y /= 6 * signedArea;
+
+          return centroid;
+        }
+
+        // Функция для разделения координат на полигоны
+        function splitIntoPolygons(coords) {
+          let polygons = [];
+          let currentPolygon = [];
+
+          for (let i = 0; i < coords.length; i++) {
+            const point = coords[i];
+            currentPolygon.push(point);
+
+            // Проверка, если текущая точка заканчивает полигон
+            if (i === coords.length - 1 || (point.x === coords[0].x && point.y === coords[0].y)) {
+              // Проверяем, если полигон имеет хотя бы 3 вершины
+              if (currentPolygon.length >= 3) {
+                polygons.push(currentPolygon);
+              }
+              currentPolygon = [];
+            }
+          }
+
+          return polygons;
+        }
+
+        console.log("Input Coordinates:");
+        console.log(coordinates);
+
+        let polygons = splitIntoPolygons(coordinates);
+
+        console.log("Polygons:");
+        console.log(polygons);
+
+        let largestPolygon = null;
+        let largestArea = 0;
+
+        polygons.forEach((polygon) => {
+          let polygonArea = calculateArea(polygon);
+
+          console.log("Polygon Area:");
+          console.log(polygonArea);
+
+          if (polygonArea > largestArea) {
+            largestArea = polygonArea;
+            largestPolygon = polygon;
+          }
+        });
+
+        console.log("Largest Polygon:");
+        console.log(largestPolygon);
+
+        if (largestPolygon) {
+          let centroid = calculatePolygonCentroid(largestPolygon);
+
+          console.log("Centroid:");
+          console.log(centroid);
+
+          return centroid;
+        } else {
+          return null;
+        }
+      }
+
+      function wktGenerate(coordinates) {
+        console.log("coordinates for wkt", coordinates);
+
+        // Если массив пуст, возвращаем ошибку
+        if (!coordinates || coordinates.length === 0) {
+          throw new Error("Пустой массив координат");
+        }
+
+        // Разделяем сплошной массив на полигоны
+        const polygons = [];
+        let currentPolygon = [];
+
+        for (let i = 0; i < coordinates.length; i++) {
+          const coord = coordinates[i];
+
+          // Добавляем точку в текущий полигон
+          currentPolygon.push(coord);
+
+          // Проверяем, совпадает ли текущая точка с началом полигона (кроме первой итерации)
+          if (currentPolygon.length > 1 && coord.x === currentPolygon[0].x && coord.y === currentPolygon[0].y) {
+            // Замыкаем полигон
+            polygons.push([...currentPolygon]);
+            currentPolygon = [];
+          }
+        }
+
+        // Если остались незамкнутые точки, добавляем их как отдельный полигон (с автозамыканием)
+        if (currentPolygon.length > 0) {
+          // Автоматически замыкаем полигон, если он не пуст
+          currentPolygon.push({ ...currentPolygon[0] });
+          polygons.push(currentPolygon);
+        }
+
+        // Определяем тип геометрии
+        let wktString;
+        if (polygons.length === 1) {
+          // Одиночный полигон
+          const polygonCoords = polygons[0].map((coord) => `${coord.y} ${coord.x}`).join(", ");
+          wktString = `POLYGON ((${polygonCoords}))`;
+        } else {
+          // Мультиполигон
+          const polygonsWKT = polygons.map((polygon) => `((${polygon.map((coord) => `${coord.y} ${coord.x}`).join(", ")}))`).join(", ");
+          wktString = `MULTIPOLYGON (${polygonsWKT})`;
+        }
+
+        return wktString;
+      }
+
+      async function arraycentroid(xml, cadNum, address, status, type) {
+        var resextractCoordinates = await extractCoordinates(xml, cadNum, address);
+        //console.log("debug1", resextractCoordinates);
+        var resprocessPolygons = await processPolygons(resextractCoordinates, status, type);
+        return resprocessPolygons;
+      }
+
+      function getTextContent(record, tagName, parentTagName = null) {
+        let element;
+        if (parentTagName) {
+          const parentElement = record.getElementsByTagName(parentTagName)[0];
+          element = parentElement ? parentElement.getElementsByTagName(tagName)[0] : null;
+        } else {
+          element = record.getElementsByTagName(tagName)[0];
+        }
+        return element ? element.textContent : "";
+      }
+
+      async function extractCoordinates(xml, cadNum, address) {
+        const coordinatesArray = [];
+        if (xml.getElementsByTagName("build_record").length > 0) {
+          buildRecords = xml.getElementsByTagName("build_record");
+
+          console.log("buildRecords", buildRecords);
+
+          for (let record of buildRecords) {
+            const skIdElement = record.querySelector("contours > contour > entity_spatial > sk_id");
+            const counterElement = record.querySelector("contours");
+            console.log("counterElement", counterElement);
+
+            if ((skIdElement && (skIdElement.textContent === "ПМСК Москвы" || skIdElement.textContent === "МСК Москвы")) || counterElement != null) {
+              const ordinates = record.querySelectorAll("build_record > contours > contour > entity_spatial > spatials_elements > spatial_element > ordinates > ordinate");
+              let coordinates = [];
+
+              for (let ordinate of ordinates) {
+                const x = ordinate.querySelector("x").textContent;
+                const y = ordinate.querySelector("y").textContent;
+                coordinates.push({ x: parseFloat(x), y: parseFloat(y) });
+              }
+
+              coordinatesArray.push({ coordinates, cadNum, address });
+            } else {
+              coordinatesArray.push({ cadNum, address });
+            }
+          }
+
+          return coordinatesArray;
+        }
+
+        if (xml.getElementsByTagName("construction_record").length > 0) {
+          buildRecords = xml.getElementsByTagName("construction_record");
+
+          console.log("construction_record", buildRecords);
+
+          for (let record of buildRecords) {
+            const skIdElement = record.querySelector("contours > contour > entity_spatial > sk_id");
+            const counterElement = record.querySelector("contours");
+            console.log("counterElement", counterElement);
+
+            if ((skIdElement && (skIdElement.textContent === "ПМСК Москвы" || skIdElement.textContent === "МСК Москвы")) || counterElement != null) {
+              const ordinates = record.querySelectorAll("construction_record > contours > contour > entity_spatial > spatials_elements > spatial_element > ordinates > ordinate");
+              let coordinates = [];
+
+              for (let ordinate of ordinates) {
+                const x = ordinate.querySelector("x").textContent;
+                const y = ordinate.querySelector("y").textContent;
+                coordinates.push({ x: parseFloat(x), y: parseFloat(y) });
+              }
+
+              coordinatesArray.push({ coordinates, cadNum, address });
+            } else {
+              coordinatesArray.push({ cadNum, address });
+            }
+          }
+
+          return coordinatesArray;
+        }
+      }
+
+      function copyTable() {
+        const tables = [document.getElementById("dataTable"), document.getElementById("dataTable_construct"), document.getElementById("dataTable_ONS"), document.getElementById("dataTable_Room")];
+        let combinedContent = "";
+
+        tables.forEach((table) => {
+          const caption = table.querySelector("caption").outerHTML;
+          const header = table.querySelector("thead").outerHTML;
+          const body = table.querySelector("tbody").outerHTML;
+          combinedContent += `<table>${caption}${header}${body}</table><br>`;
+        });
+
+        const tempElement = document.createElement("div");
+        tempElement.innerHTML = combinedContent;
+        tempElement.style.position = "absolute";
+        tempElement.style.left = "-9999px";
+        document.body.appendChild(tempElement);
+
+        const range = document.createRange();
+        range.selectNode(tempElement);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+
+        try {
+          document.execCommand("copy");
+          alert("Данные скопированы в буфер обмена.");
+        } catch (err) {
+          alert("Ошибка при копировании данных.");
+        }
+
+        window.getSelection().removeAllRanges();
+        document.body.removeChild(tempElement);
+      }
+    </script>
+  </body>
+</html>

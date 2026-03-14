@@ -1,0 +1,3257 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Node V3</title>
+    <style>
+      :root {
+        --primary-color: #2196f3;
+        --secondary-color: #1976d2;
+        --node-bg: #f5f5f5;
+        --node-border: #ccc;
+        --grid-color: #e0e0e0;
+        --selected-color: #64b5f6;
+        --processing-color: #4caf50;
+        --waiting-color: #ffc107;
+        --ready-color: #2196f3;
+      }
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        height: 100%;
+        background-color: rgb(255, 255, 255);
+      }
+
+      .map-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+
+      .map {
+        position: absolute;
+        width: 5000px;
+        height: 5000px;
+        background: radial-gradient(circle, rgba(128, 128, 128, 0.8) 2px, transparent 2px), radial-gradient(circle, rgba(255, 204, 0, 0.8) 1px, transparent 1px);
+        cursor: grab;
+        filter: blur(0.5px);
+        top: 0;
+        left: 0;
+        overflow: hidden;
+        transform-origin: 0 0;
+        transform: scale(1);
+      }
+
+      .map:active {
+        cursor: grabbing;
+      }
+
+      .load-scenario-btn,
+      .add-element-btn,
+      .save-scenario-btn {
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        white-space: nowrap;
+        flex-shrink: 0;
+        margin: 10px;
+      }
+
+      .slider-container {
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        white-space: nowrap;
+        margin: 10px;
+      }
+
+      .button-con {
+        position: fixed;
+        z-index: 1000;
+        border-radius: 5px;
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 10px;
+        flex-direction: column;
+      }
+
+      .node-el {
+        position: absolute;
+        background-color: var(--node-bg);
+        border: 1px solid var(--node-border);
+        border-radius: 6px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        min-width: 200px;
+        min-height: 120px;
+        cursor: move;
+        user-select: none;
+        transition: box-shadow 0.2s;
+      }
+      .head-node {
+        padding: 10px;
+        background-color: var(--primary-color);
+        color: white;
+        border-top-left-radius: 5px;
+        border-top-right-radius: 5px;
+        font-weight: bold;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .preloadDiv {
+        border: 2px solid #838383;
+        border-radius: 5px;
+        background-color: rgba(231, 231, 231, 0.219);
+        position: absolute;
+        width: 200px;
+        height: 100px;
+        user-select: none;
+        z-index: 2;
+      }
+
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 1;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(5px);
+      }
+
+      .modal-content {
+        background-color: #ffffff;
+        margin: 10% auto;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        width: 70%;
+        max-width: 600px;
+        animation: slideIn 0.5s ease;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(-50px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      #contextMenu {
+        display: none;
+        position: absolute;
+        background-color: #ffffff;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        z-index: 1000;
+        width: 250px;
+      }
+
+      #contextMenu button {
+        display: block;
+        width: 100%;
+        border: none;
+        background: none;
+        padding: 10px;
+        text-align: left;
+        cursor: pointer;
+        font-size: 14px;
+        color: #333;
+        border-bottom: 1px solid #ddd;
+      }
+
+      #contextMenu button:last-child {
+        border-bottom: none;
+      }
+
+      #contextMenu button:hover {
+        background-color: #f0f0f0;
+      }
+
+      #dropArea {
+        width: auto;
+        height: 100px;
+        border: 4px dashed #ccc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 1px;
+      }
+
+      #dropArea.dragover {
+        border-color: #000;
+      }
+
+      .close {
+        color: #ff8a8a;
+        float: right;
+        font-size: 38px;
+        font-weight: bold;
+        transition: color 0.3s ease;
+        border-radius: 15px;
+      }
+
+      .close:hover,
+      .close:focus {
+        color: #333;
+        cursor: pointer;
+        border-radius: 15px;
+      }
+
+      .file-icon {
+        display: inline-block;
+        text-align: center;
+        margin: 10px;
+        border-radius: 15px;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+      }
+
+      .file-icon img {
+        width: 60px;
+        height: 60px;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .file-icon p {
+        margin: 8px 0 0 0;
+        font-size: 14px;
+        color: #555;
+        border-radius: 15px;
+      }
+
+      .file-icon:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        border-radius: 15px;
+      }
+
+      h4 {
+        margin: 10px;
+        text-align: center;
+      }
+
+      .Light {
+        outline: 3px solid rgba(40, 248, 255, 0.425);
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.384);
+        background-color: rgba(255, 255, 255, 0.2);
+        transition: all 1ms ease-in-out;
+      }
+
+      #connection {
+        position: relative;
+        pointer-events: none;
+      }
+
+      #connection path {
+        fill: none;
+        stroke: green;
+        stroke-width: 2;
+        stroke-dasharray: 6;
+        animation: dash-animation 1s linear infinite;
+      }
+
+      @keyframes dash-animation {
+        from {
+          stroke-dashoffset: 0;
+        }
+        to {
+          stroke-dashoffset: -12;
+        }
+      }
+
+      @keyframes dash-animation {
+        from {
+          stroke-dashoffset: 0;
+        }
+
+        to {
+          stroke-dashoffset: -12;
+          /* Длина смещения для анимации */
+        }
+      }
+
+      .conteinPoint {
+        position: initial;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .left_pan {
+        padding: 1px;
+      }
+
+      .righ_pan {
+        padding: 1px;
+      }
+
+      .preview-result {
+        position: relative;
+        background-color: #ffffff;
+        min-width: 160px;
+        min-height: 60px;
+        border-radius: 5px;
+        border: 3px solid #838383;
+        margin: 10px;
+        text-align: -webkit-center;
+      }
+
+      .node-el .button-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+        padding: 10px;
+      }
+
+      .node-el .button-container .png-button {
+        background-color: transparent;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.3s ease;
+      }
+
+      .node-el .button-container .png-button:hover {
+        transform: scale(1.1);
+      }
+
+      .node-el .button-container .png-button:active {
+        transform: scale(0.9);
+      }
+
+      .node-el .button-container .png-button img {
+        width: 30px;
+        height: 30px;
+      }
+
+      .highlight {
+        background-color: yellow;
+        transition: background-color 0.3s ease;
+      }
+
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+      }
+
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: 0.4s;
+      }
+
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: 0.4s;
+      }
+
+      input:checked + .slider {
+        background-color: #2196f3;
+      }
+
+      input:checked + .slider:before {
+        transform: translateX(26px);
+      }
+
+      .slider.round {
+        border-radius: 34px;
+      }
+
+      .slider.round:before {
+        border-radius: 50%;
+      }
+      .task-n {
+        outline: 4px solid rgba(63, 66, 255, 0.384);
+        box-shadow: 0 0 15px #3f42ff62;
+      }
+      .selectBox {
+        position: absolute;
+        border: 1px dashed rgb(0, 0, 0);
+        background-color: rgba(63, 66, 255, 0.384);
+        z-index: 9999;
+      }
+      .selected {
+        outline: 4px solid #3f42ff62;
+        box-shadow: 0 0 15px #3f42ff62;
+      }
+
+      .toggle-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        border: 2px solid #007bff;
+        background-color: transparent;
+        border-radius: 50%;
+        cursor: pointer;
+        color: #007bff;
+        transition: all 0.3s ease;
+      }
+
+      .toggle-button:hover {
+        background-color: rgba(0, 123, 255, 0.1);
+      }
+
+      .toggle-button:active {
+        background-color: rgba(0, 123, 255, 0.2);
+      }
+
+      .toggle-button .toggle-button-icon {
+        width: 8px;
+        height: 14px;
+        fill: currentColor;
+        transform: rotate(180deg);
+        transition: transform 0.3s ease;
+        pointer-events: none;
+      }
+
+      .toggle-button .toggle-button-path {
+        fill: currentColor;
+        stroke: none !important;
+        animation: none !important;
+      }
+
+      /* Активное состояние */
+      .toggle-button.active {
+        background-color: #007bff;
+        color: white;
+      }
+
+      .toggle-button.active .toggle-button-icon {
+        transform: rotate(0deg);
+      }
+      .path_btn {
+        fill: none;
+        stroke: rgb(99, 99, 99);
+      }
+      .manager_panel {
+        display: none;
+        margin: 10px;
+        width: 600px;
+      }
+      .component_con {
+        margin: 10px;
+      }
+      .component_btn {
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        white-space: nowrap;
+        flex-shrink: 0;
+        margin: 10px;
+      }
+      .accordion-item {
+        padding: 9px;
+        background-color: rgb(254, 254, 254);
+        transition: background-color 0.3s;
+        font-family: cursive;
+        font-size: 16px;
+        font-weight: 900;
+        justify-content: center;
+        margin: 2px;
+        user-select: none;
+      }
+
+      .accordion-header {
+        color: rgb(0, 0, 0);
+        border: 3px solid rgb(0, 0, 0);
+        border-radius: 24px;
+        padding: 10px;
+        display: flex;
+        justify-content: center;
+        cursor: pointer;
+      }
+
+      .accordion-content {
+        display: none;
+        padding: 10px;
+      }
+
+      .accordion-button {
+        display: block;
+        width: 100%;
+        height: 40px;
+        padding: 8px;
+        margin-bottom: 15px;
+        text-align: left;
+        background-color: #e7e7e7;
+        border-radius: 10px;
+        border: none;
+        cursor: pointer;
+        font-size-adjust: 0.9;
+      }
+
+      .accordion-button:hover {
+        background-color: #ddd;
+      }
+
+      .accordion-content.active {
+        display: block;
+      }
+      .mainButon {
+        display: flex;
+      }
+      .resizeHandle {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        bottom: 0;
+        right: 0;
+        cursor: nw-resize;
+        background-color: var(--primary-color);
+        border-top-left-radius: 50%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="button-con">
+      <button type="button" class="toggle-button" title="Показать панель слоёв">
+        <svg class="toggle-button-icon" width="8" height="14" xmlns="http://www.w3.org/2000/svg">
+          <path d="M7.417 1.079a1.101 1.101 0 0 1 0 1.578l-4.42 4.344 4.42 4.343a1.101 1.101 0 0 1 0 1.579 1.148 1.148 0 0 1-1.606 0L.583 7.784a1.101 1.101 0 0 1 0-1.578l5.228-5.138a1.159 1.159 0 0 1 1.606.01Z"></path>
+        </svg>
+      </button>
+
+      <div class="manager_panel">
+        <div class="mainButon">
+          <button class="save-scenario-btn" id="saveScenarioBtn">Сохранить сценарий</button>
+          <button class="load-scenario-btn" id="loadScenarioBtn">Добавить сценарий</button>
+
+          <div class="slider-container">
+            <label class="switch">
+              <input type="checkbox" id="slider" />
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="component_con">
+          <div class="accordion-item">
+            <div class="accordion-header" id="XML">XML</div>
+            <div class="accordion-content">
+              <button class="accordion-button" id="downloadXML">Загрузка XML</button>
+              <button class="accordion-button" id="showTree">Дерево XML</button>
+              <button class="accordion-button" id="findTags">Селектор тэгов XML</button>
+              <button class="accordion-button" id="prewData">Отображение поступающих данных</button>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <div class="accordion-header" id="Processing_data">Обработка данных</div>
+            <div class="accordion-content">
+              <button class="accordion-button">Кнопка 1 Обработка</button>
+              <button class="accordion-button">Кнопка 2 Обработка</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <input type="file" id="fileInput" style="display: none" />
+    <div class="map-container">
+      <div class="map" id="map"></div>
+      <svg id="connection"></svg>
+    </div>
+
+    <div id="contextMenu">
+      <button id="removeNode">Удалить ноду</button>
+    </div>
+
+    <script>
+      /*
+          <button class="add-element-btn" id="addElementBtn">Добавить элемент</button>
+
+          <div id="fileModal" class="modal">
+            <div class="modal-content">
+              <span class="close">&times;</span>
+              <div id="fileIcons"></div>
+            </div>
+          </div>
+
+
+
+            <button id="clearStorage">Удалить загруженные компоненты</button>
+            <div id="dropArea">Перетащите файлы сюда</div>
+            <h4>Загруженные компоненты</h4>
+            <ul id="fileList"></ul>
+            <div id="tooltip" style="position: absolute; display: none; background-color: #f9f9f9; border: 1px solid #ccc; padding: 5px; z-index: 1000"></div>
+            <button id="chooseComponentBtn">Выберите компонент</button>
+                <div id="fileModal" class="modal">
+              <div class="modal-content">
+                <span class="close">&times;</span>
+                <div id="fileIcons"></div>
+              </div>
+            </div>
+
+            */
+
+      //#region global var
+      let savedScripts = [];
+      let selectNode;
+      let globalIndex = 0;
+      let pathData;
+      let start_lin = null;
+      let end_lin = null;
+      let load = false;
+      svg = document.getElementById("connection");
+      let paths = [];
+      const nodesMap = new Map();
+      let freeIndexes = new Set(); // Cвободные индексы
+      let selectedElements = [];
+      debug = false;
+      //#endregion global var
+
+      //#region map
+      // var Map ------------------------------------------------------------------------------------------------------------
+      let gridSize = 80;
+      let isDraggingMap = false;
+      let startX, startY, initialLeft, initialTop;
+      isDraggingSelection = false;
+      map = document.getElementById("map");
+      selectionBox = document.querySelector(".selectBox");
+      // var Map ------------------------------------------------------------------------------------------------------------
+
+      // бэкграунд карты
+      function updateGridSize() {
+        map.style.backgroundSize = `${gridSize}px ${gridSize}px`;
+        map.style.backgroundPosition = `0 0, ${gridSize / 2}px ${gridSize / 2}px`;
+      }
+
+      updateGridSize();
+
+      // определение началоной точки перемещения
+      map.addEventListener("mousedown", (e) => {
+        if (e.button === 0) {
+          isDraggingMap = true;
+          startX = e.clientX;
+          startY = e.clientY;
+          initialLeft = parseInt(window.getComputedStyle(map).left, 10) || 0;
+          initialTop = parseInt(window.getComputedStyle(map).top, 10) || 0;
+        }
+      });
+
+      map.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+      });
+
+      map.addEventListener("dblclick", function (e) {
+        removeSelectedClass(selectedElements);
+        selectedElements = [];
+      });
+
+      // перетаскивание / изменение размеров выделения
+      map.addEventListener("mousemove", (e) => {
+        if (isDraggingMap && !isDraggingSelection) {
+          const deltaX = e.clientX - startX;
+          const deltaY = e.clientY - startY;
+
+          // Получаем размеры карты и окна
+          const mapRect = map.getBoundingClientRect();
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+
+          // Ограничиваем перемещение карты
+          const newLeft = Math.max(Math.min(initialLeft + deltaX, 0), viewportWidth - mapRect.width);
+          const newTop = Math.max(Math.min(initialTop + deltaY, 0), viewportHeight - mapRect.height);
+
+          map.style.left = `${newLeft}px`;
+          map.style.top = `${newTop}px`;
+          updateLine();
+        }
+        if (!isDraggingMap && isDraggingSelection) {
+          //console.log("изменение размеров выделения");
+          const selectionBox = document.querySelector(".selectBox");
+
+          // Получаем позицию карты
+          const mapRect = map.getBoundingClientRect();
+
+          // Текущие координаты выделения относительно карты
+          const currentX = e.clientX - mapRect.left;
+          const currentY = e.clientY - mapRect.top;
+
+          const width = Math.abs(currentX - selectionStartX);
+          const height = Math.abs(currentY - selectionStartY);
+
+          selectionBox.style.width = `${width}px`;
+          selectionBox.style.height = `${height}px`;
+          selectionBox.style.left = `${Math.min(currentX, selectionStartX)}px`;
+          selectionBox.style.top = `${Math.min(currentY, selectionStartY)}px`;
+        }
+      });
+
+      map.addEventListener("mouseleave", () => {
+        isDraggingMap = false;
+        isDraggingElement = false;
+        allNode = map.querySelectorAll(".node-el");
+        allNode.forEach((node) => {
+          node.classList.remove("task-n");
+        });
+
+        //const selectionBox = document.querySelector(".selectBox");
+        //map.removeChild(selectionBox);
+        //isDraggingSelection = false;
+      });
+
+      // Обработчик отпускания кнопок мыши
+      map.addEventListener("mouseup", (e) => {
+        e.preventDefault();
+        isDraggingMap = false;
+
+        if (isDraggingSelection) {
+          const selectionBox = document.querySelector(".selectBox");
+          const boxRect = selectionBox.getBoundingClientRect();
+          const mapRect = map.getBoundingClientRect();
+
+          const boxLeft = boxRect.left - mapRect.left;
+          const boxTop = boxRect.top - mapRect.top;
+          const boxRight = boxLeft + boxRect.width;
+          const boxBottom = boxTop + boxRect.height;
+
+          document.querySelectorAll(".node-el").forEach((el) => {
+            const elRect = el.getBoundingClientRect();
+
+            const elLeft = elRect.left - mapRect.left;
+            const elTop = elRect.top - mapRect.top;
+            const elRight = elLeft + elRect.width;
+            const elBottom = elTop + elRect.height;
+
+            if (elLeft < boxRight && elRight > boxLeft && elTop < boxBottom && elBottom > boxTop) {
+              el.classList.add("selected");
+              selectedElements.push({
+                element: el,
+              });
+              console.log("selectedElements", selectedElements);
+            }
+          });
+
+          map.removeChild(selectionBox);
+
+          isDraggingSelection = false;
+        }
+      });
+
+      //выделение
+      map.addEventListener("mousedown", (e) => {
+        if (!isDraggingMap) {
+          if (e.button === 2) {
+            removeSelectedClass(selectedElements);
+            selectedElements = [];
+
+            console.log("начало выделения");
+
+            // Получаем позицию карты
+            const mapRect = map.getBoundingClientRect();
+
+            // Вычисляем начальные координаты выделения относительно карты
+            startX = e.clientX;
+            startY = e.clientY;
+
+            selectionStartX = e.clientX - mapRect.left;
+            selectionStartY = e.clientY - mapRect.top;
+
+            isDraggingSelection = true;
+            const selectionBox = document.createElement("div");
+            selectionBox.classList.add("selectBox");
+            selectionBox.style.left = `${selectionStartX}px`;
+            selectionBox.style.top = `${selectionStartY}px`;
+            map.appendChild(selectionBox);
+          }
+        }
+      });
+
+      //#endregion map
+
+      //#region conyext_menu
+      const contextMenu = document.getElementById("contextMenu");
+      const dropArea = document.getElementById("dropArea");
+      const fileListElement = document.getElementById("fileList");
+
+      function showContextMenu(x, y) {
+        contextMenu.style.left = `${x}px`;
+        contextMenu.style.top = `${y}px`;
+        contextMenu.style.display = "block";
+      }
+
+      function hideContextMenu() {
+        contextMenu.style.display = "none";
+      }
+
+      document.addEventListener("click", (event) => {
+        if (contextMenu.style.display === "block" && !contextMenu.contains(event.target)) {
+          hideContextMenu();
+        }
+      });
+
+      //dropArea
+      /*
+
+            dropArea.addEventListener("dragover", (event) => {
+              event.preventDefault();
+              dropArea.classList.add("dragover");
+            });
+
+            dropArea.addEventListener("dragleave", () => {
+              dropArea.classList.remove("dragover");
+            });
+
+            dropArea.addEventListener("drop", (event) => {
+              event.preventDefault();
+              dropArea.classList.remove("dragover");
+
+              const files = event.dataTransfer.files;
+              for (const file of files) {
+                const fileExtension = file.name.split(".").pop().toLowerCase();
+                const fileType = file.type.toLowerCase();
+
+                // Проверяем тип файла и расширение
+                if (fileExtension === "js" || fileType === "text/javascript" || fileType === "application/javascript") {
+                  const listItem = document.createElement("li");
+                  listItem.textContent = file.name;
+                  fileListElement.appendChild(listItem);
+
+                  const reader = new FileReader();
+                  reader.onload = (e) => {
+                    // Сохранение содержимого файла
+                    const scriptContent = e.target.result;
+
+                    savedScripts.push({ name: file.name, content: scriptContent });
+
+                    // Обновление localStorage
+                    localStorage.setItem("savedScripts", JSON.stringify(savedScripts));
+                  };
+                  reader.readAsText(file);
+                } else {
+                  alert("Разрешены только файлы JavaScript.");
+                }
+              }
+            });
+      */
+
+      //#endregion conyext_menu
+
+      //#region button
+      const save_btn = document.getElementById("saveScenarioBtn");
+      const load_btn = document.getElementById("loadScenarioBtn");
+      const remove_node = document.getElementById("removeNode");
+      const all_btn = document.querySelectorAll(".accordion-button");
+      const downloadXML = document.getElementById("downloadXML");
+      const showTree = document.getElementById("showTree");
+      const findTags = document.getElementById("findTags");
+      const prewData = document.getElementById("prewData");
+      let Pressbuton = false;
+
+      document.querySelector(".toggle-button").addEventListener("click", function () {
+        this.classList.toggle("active");
+        const manager_panel = document.querySelector(".manager_panel");
+        const buttonCon = document.querySelector(".button-con");
+
+        if (manager_panel.style.display == "block") {
+          manager_panel.style.display = "none";
+          buttonCon.style.backgroundColor = "";
+          buttonCon.style.boxShadow = "none";
+        } else {
+          manager_panel.style.display = "block";
+          buttonCon.style.backgroundColor = "#ffffffcc";
+          buttonCon.style.boxShadow = "2px 2px 5px rgba(0, 0, 0, 0.2)";
+        }
+        // Дополнительная логика при клике
+        //console.log("Кнопка переключения нажата");
+      });
+
+      document.querySelectorAll(".accordion-header").forEach((header) => {
+        header.addEventListener("click", () => {
+          const content = header.nextElementSibling;
+          content.classList.toggle("active");
+
+          // Закрываем другие открытые аккордеоны
+          document.querySelectorAll(".accordion-content").forEach((item) => {
+            if (item !== content) {
+              item.classList.remove("active");
+            }
+          });
+        });
+      });
+
+      save_btn.addEventListener("click", () => {
+        //Node_arr(2, null);
+        saveScenario();
+      });
+
+      load_btn.addEventListener("click", () => {
+        fileInput.click();
+      });
+
+      downloadXML.addEventListener("click", () => {
+        if (!Pressbuton) {
+          downloadXML.style.backgroundColor = "#ff8698";
+          preloadNode("downloadXML");
+          Pressbuton = true;
+        }
+      });
+
+      showTree.addEventListener("click", () => {
+        if (!Pressbuton) {
+          showTree.style.backgroundColor = "#ff8698";
+          preloadNode("showTree");
+          Pressbuton = true;
+        }
+      });
+
+      findTags.addEventListener("click", () => {
+        if (!Pressbuton) {
+          findTags.style.backgroundColor = "#ff8698";
+          preloadNode("findTags");
+          Pressbuton = true;
+        }
+      });
+
+      prewData.addEventListener("click", () => {
+        if (!Pressbuton) {
+          prewData.style.backgroundColor = "#ff8698";
+          preloadNode("prewData");
+          Pressbuton = true;
+        }
+      });
+
+      fileInput.addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const contents = e.target.result.trim();
+            const data = JSON.parse(contents);
+            load = true;
+
+            // Получаем количество существующих точек
+            const countPoint = document.querySelectorAll(".connection-node").length;
+
+            // Фаза 1: Добавление всех элементов в nodesMap
+            data.elements.forEach((element) => {
+              // Выбор индекса с учетом свободных или текущего размера
+              const index = freeIndexes.size > 0 ? freeIndexes.values().next().value : nodesMap.size;
+              if (freeIndexes.has(index)) freeIndexes.delete(index);
+
+              // Корректировка индексов в связях
+              if (element.connection) {
+                element.connection.forEach((conn) => {
+                  conn.index += countPoint;
+                  if (conn.Connection) {
+                    //console.log("Debug2", conn.Connection);
+                    conn.Connection.point_idx = Number(conn.Connection.point_idx) + countPoint;
+                    conn.Connection.mainElement_idx = index;
+                  }
+                });
+              }
+
+              // Сохраняем элемент
+              nodesMap.set(index, { ...element, index });
+              const cuuretElement = nodesMap.get(index);
+              loadNodesFromStorage(cuuretElement);
+              const componentElement = element.component;
+              //console.log("debug1", componentElement);
+              addNodeComponent(null, index, componentElement, load);
+              //updateElementComponent(null, true);
+            });
+
+            // Фаза 2: Построение карты точек для быстрого поиска
+            const pointMap = new Map();
+            nodesMap.forEach((element) => {
+              if (!element.connection) return;
+              element.connection.forEach((conn) => {
+                const key = `${conn.index}_${conn.TypePont}`;
+                pointMap.set(key, element.index);
+              });
+            });
+
+            // Фаза 3: Установка endElement_idx для всех связей
+            nodesMap.forEach((element) => {
+              if (!element.connection) return;
+              element.connection.forEach((conn) => {
+                if (!conn.Connection) return;
+
+                const targetKey = `${conn.Connection.point_idx}_${conn.Connection.type_idx}`;
+                conn.Connection.endElement_idx = pointMap.get(targetKey) || 0;
+              });
+            });
+
+            // Получаем все пути и оптимизируем их
+            console.log("nodesMap", nodesMap);
+            paths = findAllPaths(nodesMap);
+            console.log("пути", paths);
+            optimPaths = mergePaths(paths);
+            console.log("оптимизированные пути", optimPaths);
+            creatingStartingPoint(optimPaths);
+
+            /*
+                  // Обновление UI и оптимизация путей
+                  nodesMap.forEach((element) => loadNodesFromStorage(element));
+                  updateElementComponent(null, true);
+
+                  paths = findAllPaths(nodesMap);
+                  optimPaths = mergePaths(paths);
+                  creatingStartingPoint(optimPaths);
+      */
+          } catch (error) {
+            console.error("Ошибка при обработке файла:", error);
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      /*
+            choose_btn.addEventListener("click", () => {
+              hideContextMenu();
+              if (savedScripts.length > 0) {
+                const fileModal = document.getElementById("fileModal");
+                const fileIconsContainer = document.getElementById("fileIcons");
+                fileModal.style.display = "block";
+
+                // Очистка предыдущих иконок, если они есть
+                fileIconsContainer.innerHTML = "";
+
+                // Создание иконок для каждого файла в массиве savedScripts
+                savedScripts.forEach((script, index) => {
+                  const fileIcon = document.createElement("div");
+                  fileIcon.className = "file-icon";
+
+                  const img = document.createElement("img");
+                  img.src = "1.png";
+
+                  const fileName = document.createElement("p");
+                  fileName.textContent = script.name;
+
+                  // Добавляем иконку и название файла в контейнер
+                  fileIcon.appendChild(img);
+                  fileIcon.appendChild(fileName);
+                  fileIconsContainer.appendChild(fileIcon);
+
+                  // Добавляем обработчик события для клика на иконку файла
+                  fileIcon.addEventListener("click", () => {
+                    updateElementComponent(script);
+                    //console.log(`Выбран файл: ${script.name}`);
+                    //console.log(`Содержимое файла: ${script.content}`);
+
+                    // Закрываем модальное окно
+                    fileModal.style.display = "none";
+                  });
+                });
+              }
+            });
+
+            clear_btn.addEventListener("click", () => {
+              // Очистка локального хранилища
+              localStorage.removeItem("savedScripts");
+
+              // Очистка списка скриптов на странице
+              fileListElement.innerHTML = "";
+
+              // Очистка массива сохраненных скриптов
+              savedScripts = [];
+            });
+            */
+
+      document.addEventListener("DOMContentLoaded", (event) => {
+        const slider = document.getElementById("slider");
+
+        slider.addEventListener("change", (event) => {
+          if (event.target.checked) {
+            debug = true;
+          } else {
+            debug = false;
+          }
+        });
+      });
+
+      //localStorage
+      /*
+            window.addEventListener("load", () => {
+              const savedData = localStorage.getItem("savedScripts");
+              if (savedData) {
+                savedScripts = JSON.parse(savedData);
+                savedScripts.forEach((script) => {
+                  const listItem = document.createElement("li");
+                  listItem.textContent = script.name;
+                  fileListElement.appendChild(listItem);
+                });
+              }
+            });
+
+            close_btn.addEventListener("click", () => {
+              document.getElementById("fileModal").style.display = "none";
+            });
+            */
+
+      remove_node.addEventListener("click", (e) => {
+        hideContextMenu();
+        if (selectedElements.length == 0) {
+          console.log(selectNode.getAttribute("data-number_index"));
+          deleteNode(selectNode.getAttribute("data-number_index"));
+        } else {
+          selectedElements.forEach((element2) => {
+            const index = parseInt(element2.element.getAttribute("data-number_index"), 10);
+            deleteNode(index);
+          });
+        }
+      });
+      //#region button
+
+      //#region main logic node
+      // var main logic node ------------------------------------------------------------------------------------------------------------
+      let isDraggingElement = false;
+
+      // var main logic node ------------------------------------------------------------------------------------------------------------
+      function preloadNode(action) {
+        // Функция для обработки клика (удалится после первого срабатывания)
+        const handleClick = (event) => {
+          const rect = map.getBoundingClientRect();
+          all_btn.forEach((element) => {
+            element.style.backgroundColor = "#e7e7e7";
+          });
+          Pressbuton = false;
+          const leftPosition = event.clientX - rect.left;
+          const topPosition = event.clientY - rect.top;
+
+          CreateNode_in_arr(false, leftPosition, topPosition, action);
+          window.preloadDiv.remove();
+          window.preloadDiv = null;
+          // Удаляем оба обработчика после клика
+          map.removeEventListener("mousemove", handleMouseMove);
+          map.removeEventListener("click", handleClick); // Хотя {once: true} уже делает это
+        };
+
+        // Функция для отслеживания движения мыши
+        const handleMouseMove = (event) => {
+          const rect = map.getBoundingClientRect();
+          const x = event.clientX - rect.left;
+          const y = event.clientY - rect.top;
+
+          if (!window.preloadDiv) {
+            const preloadDiv = document.createElement("div");
+            preloadDiv.className = "preloadDiv";
+            preloadDiv.textContent = "Разместить ноду здесь";
+            preloadDiv.style.display = "flex";
+            preloadDiv.style.justifyContent = "center";
+            preloadDiv.style.alignItems = "center";
+            preloadDiv.style.fontSize = "18px"; // Увеличиваем шрифт
+            preloadDiv.style.fontFamily = "cursive"; // Меняем шрифт
+            map.appendChild(preloadDiv);
+            window.preloadDiv = preloadDiv;
+          }
+
+          window.preloadDiv.style.left = `${x - 100}px`;
+          window.preloadDiv.style.top = `${y - 30}px`;
+
+          //console.log("Mouse position:", {
+          //  x: event.clientX - rect.left,
+          //  y: event.clientY - rect.top,
+          //});
+        };
+
+        // Вешаем оба обработчика
+        map.addEventListener("click", handleClick, { once: true });
+        map.addEventListener("mousemove", handleMouseMove);
+
+        console.log("Tracking mouse movement... Click to stop.");
+      }
+
+      function CreateNode_in_arr(load = false, leftPosition, topPosition, componennt) {
+        let newIndex;
+        if (freeIndexes.size > 0) {
+          newIndex = Math.min(...freeIndexes); // Берем минимальный свободный индекс
+          freeIndexes.delete(newIndex);
+        } else {
+          newIndex = nodesMap.size > 0 ? Math.max(...nodesMap.keys()) + 1 : 0; // Следующий индекс
+        }
+
+        if (!load) {
+          const newNode = {
+            index: newIndex,
+            left: null,
+            top: null,
+            connection: [],
+            component: componennt,
+            Processing: {
+              status: null,
+              data: [],
+            },
+          };
+          nodesMap.set(newIndex, newNode);
+          createNodeDiv(newNode, leftPosition, topPosition, componennt); // Рендерим узел на странице
+        } else {
+          loadNodesFromStorage(); // Если загружаем, восстанавливаем сохраненные узлы
+        }
+      }
+
+      function loadNodesFromStorage(node) {
+        const existingNode = document.querySelector(`.node-el[data-number_index="${node.index}"]`);
+        if (existingNode) return; // Не дублируем элементы
+
+        const elementDiv = document.createElement("div");
+        elementDiv.className = "node-el";
+        elementDiv.setAttribute("data-number_index", node.index);
+
+        const headNode = document.createElement("h4");
+        headNode.className = "head-node";
+        headNode.textContent = `Нода ${node.index}`;
+        elementDiv.appendChild(headNode);
+
+        const leftPosition = node.left;
+        const topPosition = node.top;
+
+        // Rsazing
+
+        let isResizing = false;
+        let initialX, initialY;
+        let initialWidth, initialHeight;
+
+        const resizeHandle = document.createElement("div");
+        resizeHandle.className = "resizeHandle";
+        elementDiv.appendChild(resizeHandle);
+
+        resizeHandle.addEventListener("mousedown", (e) => {
+          e.stopPropagation();
+          isResizing = true;
+
+          // Запоминаем начальные параметры
+          initialX = e.clientX;
+          initialY = e.clientY;
+          initialWidth = parseInt(document.defaultView.getComputedStyle(elementDiv).width, 10);
+          initialHeight = parseInt(document.defaultView.getComputedStyle(elementDiv).height, 10);
+
+          document.addEventListener("mousemove", resize);
+          document.addEventListener("mouseup", stopResize);
+        });
+
+        function resize(e) {
+          if (!isResizing) return;
+
+          // Вычисляем новые размеры
+          const newWidth = initialWidth + (e.clientX - initialX);
+          const newHeight = initialHeight + (e.clientY - initialY);
+
+          // Применяем новые размеры
+          elementDiv.style.width = `${newWidth}px`;
+          elementDiv.style.height = `${newHeight}px`;
+          updateLine();
+        }
+
+        function stopResize() {
+          isResizing = false;
+          document.removeEventListener("mousemove", resize);
+          document.removeEventListener("mouseup", stopResize);
+        }
+
+        // Rsazing
+
+        elementDiv.style.left = `${leftPosition}px`;
+        elementDiv.style.top = `${topPosition}px`;
+
+        map.appendChild(elementDiv);
+        makeElementDraggable(elementDiv);
+        updateNodePositions();
+      }
+
+      function createNodeDiv(node, leftPosition, topPosition, componennt) {
+        const existingNode = document.querySelector(`.node-el[data-number_index="${node.index}"]`);
+        if (existingNode) return; // Не дублируем элементы
+
+        const elementDiv = document.createElement("div");
+        elementDiv.className = "node-el";
+        elementDiv.setAttribute("data-number_index", node.index);
+
+        const headNode = document.createElement("h4");
+        headNode.className = "head-node";
+        headNode.textContent = `Нода ${node.index}`;
+        elementDiv.appendChild(headNode);
+
+        // Rsazing
+
+        let isResizing = false;
+        let initialX, initialY;
+        let initialWidth, initialHeight;
+
+        const resizeHandle = document.createElement("div");
+        resizeHandle.className = "resizeHandle";
+        elementDiv.appendChild(resizeHandle);
+
+        resizeHandle.addEventListener("mousedown", (e) => {
+          e.stopPropagation();
+          isResizing = true;
+
+          // Запоминаем начальные параметры
+          initialX = e.clientX;
+          initialY = e.clientY;
+          initialWidth = parseInt(document.defaultView.getComputedStyle(elementDiv).width, 10);
+          initialHeight = parseInt(document.defaultView.getComputedStyle(elementDiv).height, 10);
+
+          document.addEventListener("mousemove", resize);
+          document.addEventListener("mouseup", stopResize);
+        });
+
+        function resize(e) {
+          if (!isResizing) return;
+
+          // Вычисляем новые размеры
+          const newWidth = initialWidth + (e.clientX - initialX);
+          const newHeight = initialHeight + (e.clientY - initialY);
+
+          // Применяем новые размеры
+          elementDiv.style.width = `${newWidth}px`;
+          elementDiv.style.height = `${newHeight}px`;
+          updateLine();
+        }
+
+        function stopResize() {
+          isResizing = false;
+          document.removeEventListener("mousemove", resize);
+          document.removeEventListener("mouseup", stopResize);
+        }
+
+        // Rsazing
+
+        //const leftPosition = node.left ?? 100 + (node.index % 5) * 150;
+        //const topPosition = node.top ?? 100 + Math.floor(node.index / 5) * 100;
+
+        elementDiv.style.left = `${leftPosition - 100}px`;
+        elementDiv.style.top = `${topPosition - 30}px`;
+
+        map.appendChild(elementDiv);
+        makeElementDraggable(elementDiv);
+        updateNodePositions();
+        addNodeComponent(elementDiv, node.index, componennt);
+      }
+
+      function updateNodePositions() {
+        document.querySelectorAll(".node-el").forEach((element) => {
+          const index = parseInt(element.getAttribute("data-number_index"), 10);
+          if (nodesMap.has(index)) {
+            const node = nodesMap.get(index);
+            node.left = parseInt(getComputedStyle(element).left, 10) || 0;
+            node.top = parseInt(getComputedStyle(element).top, 10) || 0;
+          }
+        });
+      }
+
+      function addNodeComponent(elementDiv, index, componennt, load) {
+        console.log("полученная нода ", elementDiv, "c idx", index, "для загрузки компонерта:", componennt);
+        if (load) {
+          elementDiv = document.querySelector(`.node-el[data-number_index="${index}"]`);
+        }
+
+        if (componennt == "downloadXML") {
+          elementDiv.querySelector(".head-node").textContent = "Загрузка XML";
+          const inputNodes = 1;
+          const outputNodes = 0;
+          createConnectionNodes(index, inputNodes, outputNodes, load);
+          downloadXMLNode(index);
+        } else if (componennt == "showTree") {
+          elementDiv.querySelector(".head-node").textContent = "Показать дерево XML";
+          const inputNodes = 1;
+          const outputNodes = 1;
+          createConnectionNodes(index, inputNodes, outputNodes, load);
+          showTreeXML(null, index, 0);
+        } else if (componennt == "findTags") {
+          elementDiv.querySelector(".head-node").textContent = "Селектор тэгов XML";
+          const inputNodes = 2;
+          const outputNodes = 1;
+          createConnectionNodes(index, inputNodes, outputNodes, load);
+          findTagsXML(null, index, 0);
+        } else if (componennt == "prewData") {
+          elementDiv.querySelector(".head-node").textContent = "Элемент для отображения";
+          const inputNodes = 1;
+          const outputNodes = 1;
+          createConnectionNodes(index, inputNodes, outputNodes, load);
+          prewdataNode(null, index);
+        }
+      }
+
+      function makeElementDraggable(element) {
+        element.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+
+          if (!(e.target.classList.contains("connection-node") && e.target.classList.contains("Light"))) {
+            console.log("e.target", e.target);
+            selectNode = element;
+            showContextMenu(e.clientX, e.clientY);
+          }
+        });
+
+        element.addEventListener("mousedown", (e) => {
+          element.classList.add("task-n");
+          isDraggingMap = false;
+          isDraggingElement = true;
+
+          startX_N = e.clientX;
+          startY_N = e.clientY;
+
+          console.log(nodesMap);
+
+          e.stopPropagation(); // Предотвращаем обработку события картой
+        });
+
+        element.addEventListener("mouseup", () => {
+          isDraggingElement = false;
+          element.classList.remove("task-n");
+        });
+
+        document.addEventListener("mousemove", (e) => {
+          if (!isDraggingElement || !element.classList.contains("task-n")) return;
+
+          e.preventDefault();
+
+          const scale = parseFloat(getComputedStyle(map).transform.split(",")[0].replace("matrix(", "")) || 1;
+
+          const x = e.clientX;
+          const y = e.clientY;
+
+          deltaX = (startX_N - x) / scale;
+          deltaY = (startY_N - y) / scale;
+
+          if (selectedElements.length == 0) {
+            const currentLeft = parseInt(getComputedStyle(element).left, 10) || 0;
+            const currentTop = parseInt(getComputedStyle(element).top, 10) || 0;
+
+            const newLeft = currentLeft - deltaX;
+            const newTop = currentTop - deltaY;
+
+            element.style.left = `${newLeft}px`;
+            element.style.top = `${newTop}px`;
+
+            startX_N = x;
+            startY_N = y;
+
+            const index = parseInt(element.getAttribute("data-number_index"), 10);
+            if (nodesMap.has(index)) {
+              const node = nodesMap.get(index);
+              node.left = newLeft;
+              node.top = newTop;
+            }
+          } else {
+            selectedElements.forEach((element2) => {
+              const currentLeft = parseInt(getComputedStyle(element2.element).left, 10) || 0;
+              const currentTop = parseInt(getComputedStyle(element2.element).top, 10) || 0;
+
+              const newLeft = currentLeft - deltaX;
+              const newTop = currentTop - deltaY;
+
+              element2.element.style.left = `${newLeft}px`;
+              element2.element.style.top = `${newTop}px`;
+
+              startX_N = x;
+              startY_N = y;
+
+              const index = parseInt(element2.element.getAttribute("data-number_index"), 10);
+              if (nodesMap.has(index)) {
+                const node = nodesMap.get(index);
+                node.left = newLeft;
+                node.top = newTop;
+              }
+            });
+          }
+          requestAnimationFrame(updateLine); // 🔹 Оптимизация обновление линий
+        });
+      }
+
+      function removeSelectedClass(elements) {
+        elements.forEach((item) => {
+          if (item.element) {
+            item.element.classList.remove("selected");
+          }
+        });
+      }
+
+      function saveScenario() {
+        const dataToSave = {
+          elements: Array.from(nodesMap.values()), // Преобразуем Map в массив объектов
+        };
+
+        const jsonContent = JSON.stringify(dataToSave, null, 2);
+        const blob = new Blob([jsonContent], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "scenario.json";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        URL.revokeObjectURL(url); // Освобождаем память
+      }
+
+      /*
+            function updateElementComponent(component, load) {
+              const nodeElementsCount = document.querySelectorAll(".node-el").length;
+
+              if (load) {
+                nodesMap.forEach((element) => {
+                  if (element.component) {
+                    fulfilledScript(element.index, load);
+                  }
+                });
+              } else {
+                if (selectNode) {
+                  console.log("обработка");
+                  const index = parseInt(selectNode.getAttribute("data-number_index"), 10);
+                  if (nodesMap.has(index)) {
+                    const node = nodesMap.get(index);
+                    node.component = component.name;
+                    fulfilledScript(node.index);
+                  }
+                }
+              }
+            }
+      */
+      //fulfilledScript
+      /*
+            async function fulfilledScript(idx, load, response, dataForConnect, sendingData) {
+              console.log("load на входе", load, "response", response);
+
+              if (!nodesMap.has(idx)) return; // Если узел не найден, выходим
+
+              const nodeData = nodesMap.get(idx);
+              const elementHTML = document.querySelector(`.node-el[data-number_index="${idx}"]`);
+
+              if (!nodeData || !nodeData.component) return;
+
+              // Ищем соответствующий скрипт в savedScripts (если это тоже Map)
+              const script = savedScripts instanceof Map ? savedScripts.get(nodeData.component) : savedScripts.find((s) => s.name === nodeData.component);
+
+              if (script) {
+                try {
+                  // Создаём функцию с содержимым скрипта
+                  const executeScript = new Function("el", "idx", "load", "response", "dataForConnect", "sendingData", script.content);
+
+                  // Выполняем функцию, передавая elementHTML как аргумент
+                  nodeData.componentOutput = await executeScript(elementHTML, idx, load, response, dataForConnect, sendingData);
+                } catch (error) {
+                  console.error(`Ошибка при выполнении скрипта ${nodeData.component}:`, error);
+                  nodeData.componentOutput = `Ошибка: ${error.message}`;
+                }
+              } else {
+                console.warn(`Скрипт с именем ${nodeData.component} не найден.`);
+                nodeData.componentOutput = `Скрипт не найден: ${nodeData.component}`;
+              }
+            }
+      */
+
+      function createConnectionNodes(indexMainElement, inputNodes, outputNodes, load) {
+        // Находим элемент на странице по индексу
+        const element = document.querySelector(`.node-el[data-number_index="${Number(indexMainElement)}"]`);
+        if (!element) {
+          console.error("Element not found");
+          return;
+        }
+
+        // Удаляем существующие узлы перед созданием новых
+        element.querySelectorAll(".connection-node").forEach((node) => node.remove());
+
+        // Высота для распределения узлов
+        const spacingMultiplier = 28;
+
+        // Создаем массив индексов для узлов
+        const totalNodes = inputNodes + outputNodes;
+        const globalIndex = document.querySelectorAll(".connection-node").length;
+
+        const indices = Array.from({ length: totalNodes }, (_, i) => globalIndex + i);
+
+        // Создание панелей для соединений
+        let left_pan = element.querySelector(".left_pan") || document.createElement("div");
+        left_pan.classList.add("left_pan");
+
+        let right_pan = element.querySelector(".righ_pan") || document.createElement("div");
+        right_pan.classList.add("righ_pan");
+
+        let conteinPoint = element.querySelector(".conteinPoint") || document.createElement("div");
+        conteinPoint.classList.add("conteinPoint");
+        element.appendChild(conteinPoint);
+        conteinPoint.append(left_pan, right_pan);
+
+        let preview_result = element.querySelector(".preview-result") || document.createElement("div");
+        preview_result.classList.add("preview-result");
+        element.appendChild(preview_result);
+
+        // Очистка массива connection для текущего элемента
+        const targetElement = nodesMap.get(indexMainElement);
+        if (targetElement && !load) {
+          targetElement.connection = []; // Сбрасываем список подключений
+        }
+
+        // вложеная Функция для создания узла ////////////////////////////////////
+        function createNode(type, position, index, status, load) {
+          const point = document.createElement("div");
+          point.classList.add("connection-node");
+
+          point.setAttribute("type", type);
+          point.setAttribute("number_index", index);
+
+          if (!load) {
+            point.setAttribute("connect", false);
+          } else {
+            point.setAttribute("connect", status);
+          }
+
+          point.textContent = index;
+          point.style.cssText = `
+                                    text-align: center;
+                                    position: initial;
+                                    width: 20px;
+                                    height: 20px;
+                                    border-radius: 50%;
+                                    background-color: ${type === 0 ? "rgba(120, 255, 120, 0.33)" : "rgba(255, 83, 83, 0.33)"};
+                                    border: 2px solid ${type === 0 ? "rgba(0, 103, 0, 1)" : "rgba(163, 0, 0, 1)"};
+                                    box-shadow: 0 0 5px ${type === 0 ? "rgba(0, 0, 0, 0.83)" : "rgba(0, 0, 0, 0.5)"};
+                                    ${type === 0 ? "left" : "right"}: -10px;
+                                    top: ${spacingMultiplier * (position + 1) - 10}px;
+                                    cursor: pointer;
+                                    margin-bottom: 10px;
+                                    margin-right: 2px;
+                                    margin-left: 2px;
+                                `;
+
+          const img = document.createElement("img");
+          img.src = "connect.png";
+          img.style.cssText = "width: 100%; height: 100%; border-radius: 50%; pointer-events: none;";
+          //point.appendChild(img);
+
+          if (type === 1) {
+            left_pan.appendChild(point);
+          } else {
+            right_pan.appendChild(point);
+          }
+
+          actionPoint(point);
+
+          // Добавляем информацию о созданном узле в connection
+          if (!load && targetElement && !targetElement.connection.some((conn) => conn.index === index)) {
+            targetElement.connection.push({
+              index: index,
+              TypePont: type,
+              Connection: null,
+              data: [],
+              status: false,
+            });
+          }
+        }
+        /////////////////////////////////////////////////////////////////////////////////
+
+        if (!load) {
+          // Создаем input узлы слева
+          for (let i = 0; i < inputNodes; i++) {
+            createNode(0, i, indices[i]);
+          }
+
+          // Создаем output узлы справа
+          for (let i = 0; i < outputNodes; i++) {
+            createNode(1, i, indices[inputNodes + i]);
+          }
+        } else if (load) {
+          targetElement.connection.forEach((element) => {
+            createNode(element.TypePont, element.index, element.index, element.status, load);
+          });
+        }
+      }
+
+      function actionPoint(point) {
+        point.addEventListener("mouseenter", function () {
+          this.classList.add("Light");
+        });
+
+        point.addEventListener("mouseleave", function () {
+          this.classList.remove("Light");
+        });
+
+        // начало соединения
+        point.addEventListener("dblclick", function (e) {
+          const point_el = e.target;
+
+          pointIndex = e.target.getAttribute("number_index");
+          pointType = e.target.getAttribute("type");
+          status = e.target.getAttribute("connect");
+
+          const mainEl = e.target.closest(".node-el").getAttribute("data-number_index");
+
+          const all_point = document.querySelectorAll(".connection-node");
+
+          if (pointType == 0 && status == "false") {
+            console.log("начало соединения", pointType);
+
+            paths = findAllPaths(nodesMap);
+
+            console.log("paths начало соединения ", paths);
+
+            const handleClick = function (e) {
+              const endIndex = e.target.getAttribute("number_index");
+              const endType = e.target.getAttribute("type");
+              const endEl = e.target.closest(".node-el").getAttribute("data-number_index");
+
+              console.log("paths после выбора конечной точки ", paths);
+
+              if (pointIndex !== endIndex && endEl !== mainEl && !paths.some((arr) => arr.includes(Number(endEl)) && arr.includes(Number(mainEl)))) {
+                all_point.forEach((el) => {
+                  el.removeEventListener("click", handleClick);
+                });
+
+                point_el.setAttribute("connect", true);
+                e.target.setAttribute("connect", true);
+
+                nodesMap.forEach((element) => {
+                  if (element.connection) {
+                    element.connection.forEach((element2) => {
+                      if (element2.index == point_el.getAttribute("number_index") && element2.TypePont == point_el.getAttribute("type")) {
+                        element2.status = true;
+                        console.log("Статуст начального узла изменен:", element2);
+                      }
+
+                      if (element2.index == e.target.getAttribute("number_index") && element2.TypePont == e.target.getAttribute("type")) {
+                        element2.status = true;
+                        console.log("Статуст конечного узла изменен:", element2);
+                      }
+                    });
+                  }
+                });
+
+                console.log("данные в finishConnect", pointIndex, pointType, endIndex, endType);
+                finishConnect(pointIndex, pointType, endIndex, endType);
+              }
+            };
+
+            all_point.forEach((element) => {
+              if (element.getAttribute("type") == 1) {
+                element.addEventListener("click", handleClick);
+              }
+            });
+          }
+        });
+
+        // разрыв соединения
+        point.addEventListener("contextmenu", function (e) {
+          e.preventDefault();
+
+          if (e.target.getAttribute("connect") == "true") {
+            const point_index = e.target.getAttribute("number_index");
+            const pint_type = e.target.getAttribute("type");
+            const mainElement = e.target.closest(".node-el").getAttribute("data-number_index");
+
+            // Преобразуем mainElement в число и получаем элемент из nodesMap
+            const node = nodesMap.get(Number(mainElement));
+
+            if (node && node.connection) {
+              node.connection.forEach(function (element2) {
+                if (element2.Connection !== null) {
+                  if (element2.index == Number(point_index) && element2.TypePont == Number(pint_type)) {
+                    const lineId = `line-${point_index}-${pint_type}-${element2.Connection.point_idx}-${element2.Connection.type_idx}`;
+                    const line = svg.querySelector(`#${lineId}`);
+                    if (line) {
+                      line.remove();
+                      console.log(line);
+                    }
+
+                    document.querySelectorAll(".node-el").forEach(function (element3) {
+                      if (element3.getAttribute("data-number_index") == element2.Connection.endElement_idx) {
+                        element3.querySelectorAll(".connection-node").forEach((element4) => {
+                          if (element4.getAttribute("number_index") == element2.Connection.point_idx) {
+                            element4.setAttribute("connect", false);
+                            console.log("debug 3", element4.getAttribute("number_index"));
+
+                            nodesMap.forEach((element5) => {
+                              if (element5.index == element2.Connection.endElement_idx) {
+                                if (element5.connection) {
+                                  element5.connection.forEach((element6) => {
+                                    if (element6.index == element4.getAttribute("number_index")) {
+                                      element6.status = false;
+                                      console.log("Разрыв соединения конечная точка", element6);
+                                    }
+                                  });
+                                }
+                              }
+                            });
+                          }
+                        });
+                      }
+                    });
+
+                    element2.status = false;
+                    console.log("Разрыв соединения начальная точка", element2);
+                    element2.Connection = null;
+                    e.target.setAttribute("connect", false);
+
+                    paths = findAllPaths(nodesMap);
+                    console.log("пути", paths);
+                    optimPaths = mergePaths(paths);
+                    console.log("оптимизированные пути", optimPaths);
+                    creatingStartingPoint(optimPaths);
+                  }
+                }
+              });
+            }
+          }
+        });
+      }
+
+      function finishConnect(startIndex, startType, endIndex, endType) {
+        //console.log("соединение создано", startIndex, startType, endIndex, endType);
+
+        let endElement_idx = null; // Используем let, так как значение будет изменяться
+
+        // Проходим по всем connection-node, чтобы найти endElement_idx
+        document.querySelectorAll(".connection-node").forEach((element) => {
+          if (element.getAttribute("number_index") == endIndex && element.getAttribute("type") == endType) {
+            endElement_idx = element.closest(".node-el").getAttribute("data-number_index");
+          }
+        });
+
+        // Проходим по map с узлами и проверяем соединения
+        nodesMap.forEach((element) => {
+          // Проверяем, существует ли connection для элемента и соответствует ли оно startIndex и startType
+          if (Array.isArray(element.connection)) {
+            element.connection.forEach((connection) => {
+              if (connection.index == startIndex && connection.TypePont == startType) {
+                // Устанавливаем новое соединение
+                connection.Connection = {
+                  point_idx: endIndex,
+                  type_idx: endType,
+                  mainElement_idx: element.index,
+                  endElement_idx: endElement_idx,
+                };
+                updateLine();
+              }
+            });
+          }
+        });
+
+        // Получаем все пути и оптимизируем их
+        console.log("nodesMap", nodesMap);
+        paths = findAllPaths(nodesMap);
+        console.log("пути", paths);
+        optimPaths = mergePaths(paths);
+        console.log("оптимизированные пути", optimPaths);
+        creatingStartingPoint(optimPaths);
+      }
+
+      function updateLine() {
+        nodesMap.forEach(function (element) {
+          if (Array.isArray(element.connection)) {
+            element.connection.forEach(function (conn) {
+              if (conn.Connection !== null) {
+                if (conn.Connection) {
+                  const start_pointIndex = conn.index;
+                  const start_pointType = conn.TypePont;
+                  const end_pointIndex = conn.Connection.point_idx;
+                  const end_pointType = conn.Connection.type_idx;
+
+                  renderLine(start_pointIndex, start_pointType, end_pointIndex, end_pointType);
+                  previewResultUpdate();
+                }
+              }
+            });
+          }
+        });
+      }
+
+      function renderLine(start_pointIndex, start_pointType, end_pointIndex, end_pointType) {
+        const all_point = document.querySelectorAll(".connection-node");
+
+        let start_lin, end_lin; // Объявляем переменные для хранения начальной и конечной точек
+
+        all_point.forEach(function (element) {
+          if (Number(element.getAttribute("number_index")) === Number(start_pointIndex) && Number(element.getAttribute("type")) === Number(start_pointType)) {
+            start_lin = element;
+          }
+
+          if (Number(element.getAttribute("number_index")) === Number(end_pointIndex) && Number(element.getAttribute("type")) === Number(end_pointType)) {
+            end_lin = element;
+          }
+        });
+
+        const rect1 = start_lin.getBoundingClientRect();
+        const rect2 = end_lin.getBoundingClientRect();
+
+        const containerRect = map.getBoundingClientRect(); // Координаты карты
+        const mapOffsetX = parseInt(map.style.left, 10) || 0; // Смещение карты по X
+        const mapOffsetY = parseInt(map.style.top, 10) || 0; // Смещение карты по Y
+
+        const startNodeRect = start_lin.closest(".node-el").getBoundingClientRect();
+        const endNodeRect = end_lin.closest(".node-el").getBoundingClientRect();
+
+        // Координаты подключения объектов с учётом смещения карты
+        const x1 = rect1.right - containerRect.left + mapOffsetX; // Правая сторона первого объекта
+        const y1 = rect1.top + rect1.height / 2 - containerRect.top + mapOffsetY;
+
+        const x2 = rect2.left - containerRect.left + mapOffsetX; // Левая сторона второго объекта
+        const y2 = rect2.top + rect2.height / 2 - containerRect.top + mapOffsetY;
+
+        const offsetX = Math.max(rect1.width, rect2.width, 40);
+
+        const offsetY = Math.max(rect1.height / 2, rect2.height / 2, 40);
+
+        let pathData;
+
+        // Логика построения линии
+        if (x1 < x2) {
+          // Изогнутая линия
+          const midX = (x1 + x2) / 2;
+          pathData = `
+                                    M ${x1},${y1}
+                                    C ${midX},${y1} ${midX},${y2} ${x2},${y2}
+                                `;
+        } else {
+          if (y2 > y1) {
+            // Линия вниз и влево
+            pathData = `
+                                        M ${x1},${y1}
+                                        H ${x1 + offsetX}
+                                        V ${y2 - offsetY - 30}
+                                        H ${x2 - offsetX}
+                                        V ${y2}
+                                        H ${x2}
+                                    `;
+          } else if (y2 < y1) {
+            // Линия вверх и влево
+            pathData = `
+                                        M ${x1},${y1}
+                                        H ${x1 + offsetX}
+                                        V ${y2 + endNodeRect.height}
+                                        H ${x2 - offsetX}
+                                        V ${y2}
+                                        H ${x2}
+                                    `;
+          } else {
+            // Горизонтальная линия
+            pathData = `
+                                        M ${x1},${y1}
+                                        H ${x2}
+                                    `;
+          }
+        }
+
+        const lineId = `line-${start_pointIndex}-${start_pointType}-${end_pointIndex}-${end_pointType}`;
+
+        if (start_pointIndex !== undefined && start_pointType !== undefined && end_pointIndex !== undefined && end_pointType !== undefined) {
+          let line = connection.querySelector(`#${lineId}`);
+
+          if (!line) {
+            // Создаем новый путь
+            const newPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            newPath.setAttribute("d", pathData);
+            newPath.setAttribute("id", lineId);
+            newPath.setAttribute("stroke", "black");
+            newPath.setAttribute("fill", "none");
+
+            // Добавляем путь в SVG
+            svg.appendChild(newPath);
+
+            // Расширяем SVG под нужные размеры
+            svg.setAttribute("width", containerRect.width);
+            svg.setAttribute("height", containerRect.height);
+          } else {
+            // Обновляем существующую линию
+            line.setAttribute("d", pathData);
+            line.setAttribute("width", containerRect.width);
+            line.setAttribute("height", containerRect.height);
+          }
+        }
+      }
+
+      function findAllPaths(data) {
+        // Построение графа и сбор всех целевых элементов
+        const graph = new Map();
+        const allTargets = new Set();
+
+        // Перебираем все элементы в Map
+        data.forEach(function (item) {
+          const connections = item.connection;
+          if (!Array.isArray(connections)) return;
+
+          const index = item.index;
+          connections.forEach(function (conn) {
+            if (conn.Connection && conn.Connection.endElement_idx !== null) {
+              const endElement = parseInt(conn.Connection.endElement_idx, 10);
+              if (!isNaN(endElement)) {
+                allTargets.add(endElement);
+                if (!graph.has(index)) {
+                  graph.set(index, []);
+                }
+                graph.get(index).push(endElement);
+              }
+            }
+          });
+        });
+
+        // Нахождение начальных узлов (не присутствуют в allTargets)
+        const startNodes = [];
+        data.forEach(function (item) {
+          if (!allTargets.has(item.index)) {
+            startNodes.push(item.index);
+          }
+        });
+
+        // Поиск всех путей
+        const paths = [];
+
+        function dfs(currentPath) {
+          const currentNode = currentPath[currentPath.length - 1];
+          if (!graph.has(currentNode) || graph.get(currentNode).length === 0) {
+            paths.push([...currentPath]);
+            return;
+          }
+          graph.get(currentNode).forEach(function (neighbor) {
+            currentPath.push(neighbor);
+            dfs(currentPath);
+            currentPath.pop();
+          });
+        }
+
+        startNodes.forEach(function (node) {
+          dfs([node]);
+        });
+
+        // Фильтрация путей длиной больше 1 (если нужно исключить одиночные узлы)
+        const filteredPaths = paths.filter(function (path) {
+          return path.length > 1;
+        });
+
+        return filteredPaths;
+      }
+
+      function mergePaths(paths) {
+        const graph = new Map();
+        const reverseGraph = new Map();
+        const inDegree = new Map();
+        const nodes = new Set();
+
+        // Инициализация графов и степеней
+        paths.forEach(function (path) {
+          for (var i = 0; i < path.length; i++) {
+            var node = path[i];
+            nodes.add(node);
+
+            if (!graph.has(node)) graph.set(node, new Set());
+            if (!reverseGraph.has(node)) reverseGraph.set(node, new Set());
+            if (!inDegree.has(node)) inDegree.set(node, 0); // Убедимся, что у каждого узла есть запись
+
+            if (i < path.length - 1) {
+              var next = path[i + 1];
+
+              // Прямое ребро
+              if (!graph.get(node).has(next)) {
+                graph.get(node).add(next);
+                inDegree.set(next, (inDegree.get(next) || 0) + 1);
+              }
+
+              // Обратное ребро
+              if (!reverseGraph.has(next)) reverseGraph.set(next, new Set());
+              reverseGraph.get(next).add(node);
+            }
+          }
+        });
+
+        // Поиск компонент связности через BFS
+        var visited = new Set();
+        var components = [];
+        nodes.forEach(function (node) {
+          if (!visited.has(node)) {
+            var queue = [node];
+            var component = new Set();
+            while (queue.length > 0) {
+              var current = queue.shift();
+              if (visited.has(current)) continue;
+              visited.add(current);
+              component.add(current);
+
+              // Добавляем соседей из прямого и обратного графа
+              [graph, reverseGraph].forEach(function (g) {
+                if (g.has(current)) {
+                  g.get(current).forEach(function (neighbor) {
+                    if (!visited.has(neighbor) && queue.indexOf(neighbor) === -1) {
+                      queue.push(neighbor);
+                    }
+                  });
+                }
+              });
+            }
+            components.push(component);
+          }
+        });
+
+        // Топологическая сортировка для каждой компоненты
+        return components.map(function (component) {
+          var localInDegree = new Map();
+          var localQueue = [];
+
+          // Инициализация локальных степеней
+          component.forEach(function (node) {
+            localInDegree.set(node, inDegree.get(node) || 0);
+            if (localInDegree.get(node) === 0) localQueue.push(node);
+          });
+
+          // Сортировка
+          var sorted = [];
+          while (localQueue.length > 0) {
+            var node = localQueue.shift();
+            sorted.push(node);
+            if (graph.has(node)) {
+              graph.get(node).forEach(function (neighbor) {
+                if (component.has(neighbor)) {
+                  localInDegree.set(neighbor, localInDegree.get(neighbor) - 1);
+                  if (localInDegree.get(neighbor) === 0) {
+                    localQueue.push(neighbor);
+                  }
+                }
+              });
+            }
+          }
+          return sorted;
+        });
+      }
+
+      function creatingStartingPoint(data) {
+        // Получаем все элементы с классом ".node-el"
+        var allNodes = document.querySelectorAll(".node-el");
+
+        // Удаляем контейнеры и кнопки у всех нод, которые не находятся в новом списке data
+        allNodes.forEach(function (node) {
+          var nodeIndex = node.getAttribute("data-number_index");
+          var isStillStartingNode = data.some(function (element) {
+            return element[0] == nodeIndex;
+          });
+
+          if (!isStillStartingNode) {
+            var buttonContainer = node.querySelector(".button-container");
+            if (buttonContainer) {
+              buttonContainer.remove(); // Удаляем контейнер с кнопкой
+            }
+          }
+        });
+
+        // Добавляем контейнер и кнопку только к актуальным начальным нодам
+        data.forEach(function (element) {
+          allNodes.forEach(function (node) {
+            if (element[0] == node.getAttribute("data-number_index")) {
+              // Ищем или создаём контейнер для кнопок
+              var buttonContainer = node.querySelector(".button-container") || document.createElement("div");
+              if (!buttonContainer.classList.contains("button-container")) {
+                buttonContainer.classList.add("button-container");
+                node.appendChild(buttonContainer);
+              }
+
+              // Проверяем, есть ли уже кнопка
+              var pngButton = buttonContainer.querySelector(".png-button") || document.createElement("button");
+              if (!pngButton.classList.contains("png-button")) {
+                pngButton.classList.add("png-button");
+
+                var img = document.createElement("img");
+                img.src = "2.png";
+                img.alt = "PNG Button";
+
+                pngButton.appendChild(img);
+                buttonContainer.appendChild(pngButton);
+
+                saveMinSize(node.getAttribute("data-number_index"));
+
+                pngButton.addEventListener("click", function (e) {
+                  console.log(e.target.closest(".node-el").getAttribute("data-number_index"));
+                  exutor(Number(e.target.closest(".node-el").getAttribute("data-number_index")));
+                  previewResultUpdate();
+                });
+              }
+            }
+          });
+        });
+      }
+
+      function deleteNode(indexDeleteNode) {
+        indexDeleteNode = Number(indexDeleteNode);
+        // Находим удаляемую ноду в nodesMap
+        const deletedNode = nodesMap.get(indexDeleteNode);
+        console.log("deletedNode", deletedNode, nodesMap);
+
+        if (!deletedNode) return; // Если нода не найдена, выходим
+
+        // Удаляем элемент из DOM
+        const nodeToDelete = document.querySelector(`.node-el[data-number_index="${indexDeleteNode}"]`);
+        console.log("nodeToDelete", nodeToDelete);
+        if (nodeToDelete) {
+          nodeToDelete.remove();
+        }
+
+        // Удаляем элемент из nodesMap
+        nodesMap.delete(indexDeleteNode);
+
+        // Удаляем все линии, связанные с удаляемой нодой
+        deletedNode.connection.forEach(function (conn) {
+          if (conn.Connection !== null) {
+            const lineId = `line-${conn.index}-${conn.TypePont}-${conn.Connection.point_idx}-${conn.Connection.type_idx}`;
+            const line = svg.querySelector(`#${lineId}`);
+            if (line) {
+              line.remove();
+            }
+
+            // Обновляем состояние подключения в связанной ноде
+            document.querySelectorAll(".node-el").forEach(function (element3) {
+              if (element3.getAttribute("data-number_index") == conn.Connection.endElement_idx) {
+                element3.setAttribute("connect", false);
+              }
+            });
+          }
+        });
+      }
+
+      function previewResultUpdate() {
+        if (debug) {
+          nodesMap.forEach((element) => {
+            const all_node = document.querySelector(`.node-el[data-number_index="${element.index}"]`);
+            const previewDiv = all_node.querySelector(".preview-result");
+
+            // Очищаем содержимое перед обновлением
+            previewDiv.innerHTML = "";
+
+            // Создаем массив для хранения текстовых данных
+            const content = [];
+
+            // Добавляем основные данные
+            content.push(` Индекс: ${element.index}\n`);
+            content.push(` Позиция: left=${element.left}, top=${element.top}\n`);
+
+            // Добавляем данные о соединениях
+            if (element.connection && element.connection.length > 0) {
+              content.push("Соединения:");
+              element.connection.forEach((conn) => {
+                content.push(`Индекс точки ${conn.index}; Тип точки ${conn.TypePont}; Дата ${conn.data}`);
+              });
+            } else {
+              content.push("Соединения: Нет данных");
+            }
+
+            // Объединяем массив в одну строку с переносами
+            previewDiv.textContent = content.join("\n");
+          });
+        }
+      }
+
+      function exutor(initiator_index) {
+        // Получаем пути и данные
+        var paths = findAllPaths(nodesMap);
+        var data = mergePaths(paths);
+
+        console.log("initiator_index", initiator_index);
+        console.log("data", data);
+
+        data.forEach(function (element) {
+          console.log("1 --", element[0]);
+
+          if (element[0] == initiator_index) {
+            element.forEach(function (element2) {
+              console.log("Обработка пути", element2);
+
+              var node = nodesMap.get(element2);
+              var nodeConnection = node.connection;
+              const nodeDiv = document.querySelector(`.node-el[data-number_index="${node.index}"]`);
+
+              console.log("Инициация обработки пути, нода:", element2);
+              console.log("Данные о подключении ноды:", nodeConnection);
+
+              if (node.Processing.status == "ready") {
+                // 1. поместить данные в узел для отправки
+                placeData(node);
+                // 2. отправить данные подключенному узлу
+                MoveData(node);
+              }
+
+              if (node.Processing.status == "waiting") {
+                // 1. функция отвечающая за обработку данных внутри компонента, которая будет
+                // маршрутизировать данные внутри компонента и выводить обработанные данные по
+                // разнм узлам
+                placeData(node);
+                const comonentName = node.component;
+                transmitterData(comonentName, node);
+                MoveData(node);
+              }
+
+              nodeDiv.classList.add("highlight");
+
+              // Удаляем класс через 0.15 секунд
+              setTimeout(() => {
+                nodeDiv.classList.remove("highlight");
+              }, 150);
+
+              function placeData(node) {
+                console.log("Помещение данных в узел", node);
+                //запрашиваем config компонента
+                const comonentName = node.component;
+                const config = route(comonentName);
+
+                const arrPoint = [];
+
+                node.connection.forEach((con) => {
+                  if (con.TypePont == 0) {
+                    arrPoint.push({ con });
+                  }
+
+                  //console.log("arrPoint", arrPoint);
+
+                  arrPoint.forEach((element, indx) => {
+                    if (element.con.Connection) {
+                      const cfgEntry = config.get(indx);
+                      console.log("cfgEntry", cfgEntry);
+                      console.log("element", element.con);
+
+                      const dataItem = node.Processing.data.find((item) => item.flag == cfgEntry.flag);
+                      console.log("dataItem", dataItem);
+                      const dataNode = dataItem.data;
+                      const dataflag = dataItem.flag;
+
+                      node.connection.find((item) => item.index == element.con.index).data[indx] = {
+                        flag: dataflag,
+                        data: dataNode,
+                      };
+
+                      console.log(
+                        "находим узел в map",
+                        node.connection.find((item) => item.index == element.con.index)
+                      );
+
+                      //console.log("debug_3", flag);
+                    }
+                    //console.log("debug_2", node.connection.find((item) => item.index == element.con.index));
+                  });
+                });
+
+                console.log("Найденные узлы с TypePont 0", arrPoint);
+
+                //console.log("cfg компонента", config);
+                //console.log("нода", node);
+                //console.log("узлы ноды куда нужно поместить данные", node.connection);
+                //console.log("данные которые нужно поместить", node.Processing);
+              }
+
+              function MoveData(node) {
+                node.connection.forEach((element) => {
+                  if (element.data) {
+                    console.log(element.Connection);
+                    const advancedData = element.data;
+                    console.log("advancedData", advancedData);
+
+                    if (element.Connection) {
+                      const nodeRecipient = nodesMap.get(Number(element.Connection.endElement_idx));
+
+                      // Инициализация data, если она не существует
+                      if (!nodeRecipient.Processing.data) {
+                        nodeRecipient.Processing.data = [];
+                      }
+
+                      if (advancedData.length > 1) {
+                        advancedData.forEach((element2, idx) => {
+                          // Если элемента с таким индексом нет, создаем его
+                          if (!nodeRecipient.Processing.data[idx]) {
+                            nodeRecipient.Processing.data[idx] = {
+                              flag: 0,
+                              data: null,
+                            };
+                          }
+
+                          // Обновляем данные
+                          nodeRecipient.Processing.data[idx] = {
+                            ...nodeRecipient.Processing.data[idx], // сохраняем существующие свойства
+                            ...element2, // перезаписываем новыми данными
+                          };
+                        });
+                      } else if (advancedData.length === 1) {
+                        // Для одного элемента
+                        if (!nodeRecipient.Processing.data[0]) {
+                          nodeRecipient.Processing.data[0] = {
+                            flag: 0,
+                            data: null,
+                          };
+                        }
+                        nodeRecipient.Processing.data[0] = {
+                          ...nodeRecipient.Processing.data[0],
+                          ...advancedData[0],
+                        };
+                      }
+
+                      console.log("данные отправлены в ноду", nodeRecipient);
+                      element.data = [];
+                    }
+                  }
+                });
+              }
+
+              function route(comonentName) {
+                // множественным, не однородным, данным в Processing.data можно присваивать
+                // определенные флаги для управления их траспортировкой
+                /*
+                структура cfg
+                  cfg = {порядковый индекс узла, флаг}
+                */
+                const config = new Map();
+
+                const standart = { index: 0, flag: 0 };
+
+                if (comonentName == "downloadXML") {
+                  config.set(0, standart);
+                } else if (comonentName == "showTree") {
+                  config.set(0, standart);
+                } else if (comonentName == "findTags") {
+                  config.set(0, { index: 0, flag: 0 });
+                  config.set(1, { index: 1, flag: 1 });
+                } else if (comonentName == "prewData") {
+                  config.set(0, standart);
+                }
+                return config;
+              }
+
+              function transmitterData(comonentName, node) {
+                if (comonentName == "downloadXML") {
+                  // функция работает изначально, не требует дополнительной обработки данных
+                  return;
+                } else if (comonentName == "showTree") {
+                  //console.log("debug_5", node.Processing.data[0].data);
+                  showTreeXML(node.Processing.data, node.index, 1);
+                } else if (comonentName == "findTags") {
+                  findTagsXML(node.Processing.data[0].data, node.index, 1);
+                } else if (comonentName == "prewData") {
+                  prewdataNode(node.Processing.data, node.index);
+                }
+              }
+
+              //fulfilledScript(element2, false, true, nodeConnection, sendingData);
+            });
+          }
+        });
+      }
+
+      function saveMinSize(idx) {
+        console.log("debug_1", idx);
+        const node = document.querySelector(`.node-el[data-number_index="${idx}"]`);
+        const nodeW = parseInt(getComputedStyle(node).width, 10);
+        const nodeH = parseInt(getComputedStyle(node).heigh, 10);
+
+        node.style.minHeight = nodeW + 10 + "px";
+        node.style.minWidth = nodeH + 10 + "px";
+      }
+
+      // старая версия обработки данных
+      /*
+            function MoveData(startIndexNode, startIndexPoint, startTypePoint, endElement_idx, point_idx, type_idx) {
+              console.groupCollapsed(`%c"Перемещение данных`, "color: orange; font-weight: bold; font-size: 12px;");
+              console.table([{ startIndexNode, startIndexPoint, startTypePoint, endElement_idx, point_idx, type_idx }]);
+              console.groupEnd();
+
+              let movingData = null;
+
+              nodesMap.forEach(function (element) {
+                if (element.index === startIndexNode && Array.isArray(element.connection)) {
+                  element.connection.forEach(function (element2) {
+                    if (element2.Connection !== null) {
+                      if (element2.index === startIndexPoint && element2.TypePont === startTypePoint) {
+                        movingData = element2.data;
+                        console.groupCollapsed("Найденные данные для перемещения");
+                        console.table([{ "Исходный узел": element2, Данные: movingData }]);
+                        console.groupEnd();
+
+                        nodesMap.forEach(function (element3) {
+                          if (element3.index === endElement_idx && Array.isArray(element3.connection)) {
+                            element3.connection.forEach(function (element4) {
+                              if (element4.index === point_idx && element4.TypePont === type_idx) {
+                                element4.data = movingData;
+                                console.groupCollapsed("Помещение данных в новый узел");
+                                console.table([{ "Целевой узел": element4, "Перемещенные данные": movingData }]);
+                                console.groupEnd();
+                              }
+                            });
+                          }
+                        });
+
+                        element2.data = null;
+                        console.groupCollapsed("Очистка данных в исходном узле");
+                        console.table([{ "Очищенный узел": element }]);
+                        console.groupEnd();
+                      }
+                    } else {
+                      console.log("отсутствуют узлы для перемещения, остановка функции MoveData");
+                      return;
+                    }
+                  });
+                }
+              });
+
+              return movingData;
+            }
+
+            function placeData(idx, startPointIndex, startPointTypePont, data, insideNode, placeIndexPoint, placeTypePoint) {
+              console.groupCollapsed(`%c Помещение данных в целевой узел, узел подключения: `, "color: lightgreen; font-weight: bold;");
+              console.table([{ "Индекс ноды": idx, "Индекс узла": startPointIndex, "Тип узла": startPointTypePont, "Передоваемые данные": data }]);
+
+              nodesMap.get(idx).connection.forEach(function (element) {
+                if (element.index == startPointIndex && element.TypePont == startPointTypePont) {
+                  element.data = data;
+                  console.groupCollapsed("Помещение данных в узел");
+                  console.table([{ "Элемент узла": element, "Новые данные": data }]);
+                  console.groupEnd();
+                  console.groupEnd();
+                }
+              });
+
+              if (insideNode) {
+                /// Дополнительно очищаем узел перед функцией MoveData
+                nodesMap.get(idx).connection.forEach((element) => {
+                  if (element.index == placeIndexPoint && element.TypePont == placeTypePoint) {
+                    element.data = null;
+                  }
+                });
+              }
+            }
+
+            async function dataExtractionForProcessing() {
+              const data = 0;
+              return data;
+            }
+            */
+
+      //#endregion main logic node
+
+      //#region function node
+      function downloadXMLNode(selectedElementIndex) {
+        // Ищем элемент с атрибутом data-number_index, равным selectedElementIndex
+        const previewResultEL = Array.from(document.querySelectorAll(".node-el")).find((element) => {
+          return element.getAttribute("data-number_index") == selectedElementIndex;
+        });
+
+        nodesMap.get(selectedElementIndex).Processing.status = "waiting";
+
+        // Если элемент найден, ищем его дочерний элемент с классом .preview-result
+        if (previewResultEL) {
+          let resultElement = previewResultEL.querySelector(".preview-result");
+          let headNode = previewResultEL.querySelector(".head-node");
+
+          // Инициализация хранилища для XML данных
+          let count = 0;
+          headNode.textContent = "Загрузка XML";
+
+          resultElement.textContent = `Перетащите файлы сюда \n Файлов загружено: ${count}`;
+          resultElement.style.textAlign = "-webkit-center";
+          resultElement.style.whiteSpace = "break-spaces";
+          resultElement.style.border = "2px dashed #007BFF";
+
+          // Общая функция обработки файлов
+          const handleFiles = (files) => {
+            count = 0;
+            const xmlContents = [];
+            Array.from(files).forEach((file) => {
+              const reader = new FileReader();
+
+              reader.onload = function (e) {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(e.target.result, "text/xml");
+
+                // Добавляем результат в массив
+
+                xmlContents.push({
+                  filename: file.name,
+                  content: xmlDoc,
+                });
+
+                console.log("debug_xmlContents", xmlContents);
+
+                nodesMap.get(selectedElementIndex).Processing.status = "ready";
+                nodesMap.get(selectedElementIndex).Processing.data[0] = {
+                  flag: 0,
+                  data: xmlContents,
+                };
+
+                // Обновляем счетчик
+                count++;
+                resultElement.textContent = `Перетащите файлы сюда \n Файлов загружено: ${count}`;
+
+                // Выводим в консоль
+                console.log("Загруженные XML данные:", xmlContents);
+              };
+
+              reader.readAsText(file);
+            });
+          };
+
+          // Обработчики событий
+          resultElement.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            resultElement.classList.add("dragover");
+          });
+
+          resultElement.addEventListener("dragleave", () => {
+            resultElement.classList.remove("dragover");
+          });
+
+          resultElement.addEventListener("drop", (event) => {
+            event.preventDefault();
+            resultElement.classList.remove("dragover");
+            handleFiles(event.dataTransfer.files);
+          });
+
+          // Унифицированный обработчик для input
+          document.getElementById("fileInput").addEventListener("change", function (event) {
+            handleFiles(event.target.files);
+            event.target.value = ""; // Очищаем input для возможности повторной загрузки
+          });
+
+          return resultElement; // Возвращаем найденный элемент
+        } else {
+          console.log("Element not found");
+          return null; // Если элемент не найден, возвращаем null
+        }
+      }
+
+      function showTreeXML(placeDataPoint, idx, requst) {
+        if (requst == 0) {
+          nodesMap.get(idx).Processing.status = "waiting";
+          return;
+        }
+
+        const processData = nodesMap.get(idx).Processing.data[0].data;
+
+        const node = document.querySelector(`.node-el[data-number_index="${idx}"]`);
+        const prevNode = node.querySelector(".preview-result");
+
+        prevNode.innerHTML = ""; // Очищаем перед добавлением нового дерева
+
+        const dynamicStyle = document.createElement("style");
+        dynamicStyle.id = "dynamic-styles";
+        prevNode.appendChild(dynamicStyle);
+        dynamicStyle.textContent = `
+        .xml-tree-container{
+        max-height: 380px;
+        overflow-y: auto;
+        padding: 8px;
+        background: #f9f9f9;
+        border-radius: 5px;
+        font-family: cursive;
+        white-space: white-space;
+        word-break: break-word;
+        scrollbar-width: thin;
+        scrollbar-color: #999 #f9f9f9;
+        text-align: start;
+        }
+
+          .xml-tree-container::-webkit-scrollbar {
+            width: 8px;
+          }
+          .xml-tree-container::-webkit-scrollbar-thumb {
+            background: #999;
+            border-radius: 4px;
+          }
+          .xml-tree-container::-webkit-scrollbar-thumb:hover {
+            background: #777;
+          }
+
+        .searchInput{
+        width: 90%;
+        padding: 8px 12px;
+        margin-bottom: 8px;
+        border: 1px solid #aaa;
+        border-radius: 6px;
+        font-size: 14px;
+        background: #fff;
+        transition: border-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+        outline: none;
+        }
+        .flip-container{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+            .flip-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            border: none;
+            background-color: #4c3963;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .flip-btn:active {
+            transform: scale(0.95);
+        }
+
+        .disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: #cccccc !important;
+        }
+        .resultCount{
+        font-size: 14px;
+        color: #555;
+        margin-bottom: 5px;
+        }
+        .pathContainer{
+        font-size: 14px;
+        color: #444;
+        margin-bottom: 10px;
+        padding: 5px;
+        border-bottom: 1px solid #ccc;
+        white-space: pre-line;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-direction: column;
+        text-align: center;
+        }
+        .copyButton{
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        cursor: pointer;
+        border-radius: 3px;
+        display: none;
+        }
+        .prevNmaeFile{
+        background: #f9f9f9;
+        display: flex;
+        align-items: center;
+        margin-right: 15px;
+        margin-left: 15px;
+        }
+        `;
+
+        if (!processData || !processData[0]?.content) {
+          console.error("Некорректные данные для XML");
+          return;
+        }
+
+        const xmlString = new XMLSerializer().serializeToString(processData[0].content);
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlString, "application/xml");
+
+        // Создаём контейнер для дерева
+        const container = document.createElement("div");
+        container.classList.add("xml-tree-container");
+
+        // Строка поиска
+        const searchInput = document.createElement("input");
+        searchInput.classList.add("searchInput");
+        searchInput.type = "text";
+        searchInput.placeholder = "Поиск по тегам и данным...";
+
+        const flipContainer = document.createElement("div");
+        flipContainer.classList.add("flip-container");
+
+        const prevBtn = document.createElement("button");
+        prevBtn.classList.add("flip-btn");
+        prevBtn.classList.add("disabled");
+        prevBtn.id = "prevBtn";
+        prevBtn.textContent = "←";
+
+        const prevNmaeFile = document.createElement("div");
+        prevNmaeFile.classList.add("prevNmaeFile");
+        prevNmaeFile.textContent = processData[0].filename;
+
+        const nextBtn = document.createElement("button");
+        nextBtn.classList.add("flip-btn");
+        nextBtn.id = "nextBtn";
+        nextBtn.textContent = "→";
+
+        flipContainer.appendChild(prevBtn);
+        flipContainer.appendChild(prevNmaeFile);
+        flipContainer.appendChild(nextBtn);
+
+        // Текущая страница
+        let currentPage = 0;
+        const totalPages = processData.length - 1; // Всего страниц
+
+        // Обновляем состояние кнопок
+        function updateButtons() {
+          const mainTree = prevNode.querySelector(".main-tree");
+          //console.log("mainTree", mainTree);
+          mainTree.remove();
+          prevBtn.disabled = currentPage === 0;
+          nextBtn.disabled = currentPage === totalPages;
+          prevNmaeFile.textContent = processData[currentPage].filename;
+
+          const xmlStringUpdate = new XMLSerializer().serializeToString(processData[currentPage].content);
+          const parserUpdate = new DOMParser();
+          const xmlDocUpdate = parserUpdate.parseFromString(xmlStringUpdate, "application/xml");
+
+          const newTree = createTree(xmlDocUpdate.documentElement);
+          container.appendChild(newTree);
+
+          if (prevBtn.disabled) {
+            prevBtn.classList.add("disabled");
+          } else {
+            prevBtn.classList.remove("disabled");
+          }
+
+          if (nextBtn.disabled) {
+            nextBtn.classList.add("disabled");
+          } else {
+            nextBtn.classList.remove("disabled");
+          }
+        }
+
+        // Обработчики событий
+        prevBtn.addEventListener("click", () => {
+          if (currentPage > 0) {
+            currentPage--;
+            updateButtons();
+            console.log(`Переход на страницу ${currentPage}`);
+            // Здесь можно добавить логику перелистывания
+          }
+        });
+
+        nextBtn.addEventListener("click", () => {
+          if (currentPage < totalPages) {
+            currentPage++;
+            updateButtons();
+            console.log(`Переход на страницу ${currentPage}`);
+            // Здесь можно добавить логику перелистывания
+          }
+        });
+
+        // Добавляем эффект фокуса searchInput
+        searchInput.addEventListener("focus", () => {
+          searchInput.style.borderColor = "#007bff";
+          searchInput.style.boxShadow = "0 0 5px rgba(0, 123, 255, 0.5)";
+        });
+
+        searchInput.addEventListener("blur", () => {
+          searchInput.style.borderColor = "#aaa";
+          searchInput.style.boxShadow = "none";
+        });
+
+        // Контейнер для вывода количества найденных элементов
+        const resultCount = document.createElement("div");
+        resultCount.classList.add("resultCount");
+
+        container.prepend(resultCount);
+
+        let searchResults = []; // Массив найденных элементов
+        let searchIndex = -1; // Текущий индекс найденного элемента
+
+        // Функция для раскрытия родительских тегов
+        function expandParents(element) {
+          while (element && element !== container) {
+            if (element.tagName === "UL") {
+              element.style.display = "block";
+            }
+            element = element.parentElement;
+          }
+        }
+
+        // Обработчик поиска
+        searchInput.addEventListener("input", function () {
+          const searchValue = searchInput.value.toLowerCase();
+          searchResults = [];
+          searchIndex = -1;
+
+          const tags = container.querySelectorAll(".xml-tag, .xml-value");
+          tags.forEach((tag) => {
+            if (tag.textContent.toLowerCase().includes(searchValue) && searchValue.length > 0) {
+              tag.style.background = "yellow";
+              searchResults.push(tag);
+              expandParents(tag); // Раскрываем родительские теги
+            } else {
+              tag.style.background = "transparent";
+            }
+          });
+
+          resultCount.textContent = searchResults.length > 0 ? `Найдено: ${searchResults.length}` : "Ничего не найдено";
+        });
+
+        // Обработчик навигации по найденным элементам (по Enter)
+        searchInput.addEventListener("keydown", function (event) {
+          if (event.key === "Enter" && searchResults.length > 0) {
+            event.preventDefault();
+
+            // Убираем выделение с предыдущего найденного элемента
+            if (searchIndex >= 0) {
+              searchResults[searchIndex].style.background = "yellow";
+            }
+
+            // Переход к следующему найденному элементу
+            searchIndex = (searchIndex + 1) % searchResults.length;
+            searchResults[searchIndex].style.background = "orange";
+
+            // Прокрутка к текущему найденному элементу
+            searchResults[searchIndex].scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        });
+
+        // Контейнер для отображения пути к элементу
+        const pathContainer = document.createElement("div");
+        pathContainer.classList.add("pathContainer");
+
+        container.prepend(pathContainer);
+
+        // Кнопка для копирования пути
+        const copyButton = document.createElement("button");
+        copyButton.classList.add("copyButton");
+        copyButton.textContent = "Копировать путь";
+
+        copyButton.addEventListener("click", () => {
+          if (copyButton.dataset.path) {
+            navigator.clipboard.writeText(copyButton.dataset.path).then(() => {
+              copyButton.textContent = "Скопировано!";
+              setTimeout(() => (copyButton.textContent = "Копировать путь"), 1500);
+            });
+          }
+        });
+
+        pathContainer.appendChild(copyButton);
+
+        function getElementPathInXML(element, container) {
+          const path = []; // Массив для хранения пути (чтобы сохранить порядок)
+          let lastTagLevel = null; // Последний добавленный тег (чтобы избежать дубликатов)
+
+          console.log("debug_1", element);
+          console.log("debug_2", container);
+
+          while (element && element !== container) {
+            if (element.nodeType === Node.ELEMENT_NODE) {
+              const tagElement = element.querySelector(".xml-tag");
+
+              if (tagElement) {
+                const currentLevel = tagElement.getAttribute("level");
+
+                // Выводим только если уровень изменился или это первый элемент
+                if (currentLevel !== lastTagLevel) {
+                  console.log("debug_3", tagElement.textContent);
+                  //console.log("debug_4", currentLevel, lastTagLevel);
+                  lastTagLevel = currentLevel;
+                  path.push(tagElement.textContent.replace("▼", "").trim());
+                }
+              }
+            }
+
+            element = element.parentElement;
+          }
+          console.log("path", path);
+          return path.reverse().join(" / ");
+        }
+
+        // Функция для создания дерева XML
+        const nodeMap = new WeakMap(); // Для связи контейнеров с XML-узлами
+        function createTree(node, level = 0) {
+          const ul = document.createElement("ul");
+          ul.classList.add("main-tree");
+          ul.style.listStyle = "none";
+          ul.style.paddingLeft = "15px";
+
+          Array.from(node.childNodes).forEach((child) => {
+            const li = document.createElement("li");
+            if (child.nodeType === Node.ELEMENT_NODE) {
+              const tag = document.createElement("span");
+              tag.textContent = `<${child.nodeName}>`;
+              tag.classList.add("xml-tag");
+              tag.setAttribute("Level", level); // Устанавливаем текущий уровень
+              tag.style.cssText = "color: blue; cursor: pointer; display: block;";
+
+              const hasChildren = child.childNodes.length > 0;
+
+              if (hasChildren) {
+                // Добавляем индикатор
+                const indicator = document.createElement("span");
+                indicator.textContent = "▶";
+                indicator.style.marginRight = "5px";
+                tag.prepend(indicator);
+
+                // Создаём контейнер для дочерних элементов
+                const childContainer = document.createElement("ul");
+                childContainer.setAttribute("Level", level + 1); // Увеличиваем уровень для дочерних элементов
+                childContainer.style.display = "none";
+                childContainer.style.paddingLeft = "15px";
+                childContainer.style.listStyle = "none";
+
+                // Сохраняем ссылку на XML-узел
+                nodeMap.set(childContainer, child);
+                childContainer.dataset.loaded = "false";
+
+                // Обработчик клика
+                tag.addEventListener("click", () => {
+                  if (childContainer.dataset.loaded === "false") {
+                    const xmlChild = nodeMap.get(childContainer);
+                    const subtree = createTree(xmlChild, level + 1); // Передаём level + 1 в рекурсивный вызов
+                    childContainer.appendChild(subtree);
+                    childContainer.dataset.loaded = "true";
+                  }
+
+                  // Переключаем видимость и индикатор
+                  const isHidden = childContainer.style.display === "none";
+                  childContainer.style.display = isHidden ? "block" : "none";
+                  indicator.textContent = isHidden ? "▼" : "▶";
+                });
+
+                li.appendChild(tag);
+                li.appendChild(childContainer);
+              } else {
+                // Без дочерних элементов
+                tag.style.cursor = "default";
+                li.appendChild(tag);
+              }
+            } else if (child.nodeType === Node.TEXT_NODE && child.nodeValue.trim()) {
+              const textNode = document.createElement("span");
+              textNode.textContent = child.nodeValue;
+              textNode.classList.add("xml-value");
+              textNode.style.cssText = "color: green; cursor: pointer;";
+
+              textNode.addEventListener("click", (event) => {
+                // Получаем путь к элементу
+                const path = getElementPathInXML(event.target, container);
+
+                // Обновляем кнопку копирования
+                copyButton.style.display = "inline-block";
+                copyButton.dataset.path = path;
+
+                // Создаём ссылку на элемент
+                pathContainer.innerHTML = "";
+                pathContainer.appendChild(copyButton);
+
+                const pathLink = document.createElement("span");
+                pathLink.textContent = path;
+                pathLink.style.cssText = "color: #007bff; cursor: pointer; text-decoration: underline;";
+
+                pathLink.addEventListener("click", () => {
+                  textNode.style.background = "orange";
+                  setTimeout(() => (textNode.style.background = "transparent"), 1500);
+                  textNode.scrollIntoView({ behavior: "smooth", block: "center" });
+                });
+
+                pathContainer.appendChild(pathLink);
+              });
+
+              li.appendChild(textNode);
+            }
+
+            ul.appendChild(li);
+          });
+
+          return ul;
+        }
+
+        const tree = createTree(xmlDoc.documentElement);
+        container.appendChild(searchInput);
+        container.appendChild(flipContainer);
+        container.appendChild(tree);
+        prevNode.appendChild(container);
+      }
+
+      function findTagsXML(placeDataPoint, idx, requst) {
+        if (requst == 0) {
+          nodesMap.get(idx).Processing.status = "waiting";
+          return;
+        }
+
+        const processData = nodesMap.get(idx).Processing.data[0].data;
+
+        if (!processData || !processData[0]?.content) {
+          console.error("Некорректные данные для XML");
+          return;
+        }
+
+        const node = document.querySelector(`.node-el[data-number_index="${idx}"]`);
+        const prevNode = node.querySelector(".preview-result");
+        prevNode.innerHTML = ""; // Очищаем перед добавлением
+
+        const dynamicStyle = document.createElement("style");
+        dynamicStyle.id = "dynamic-styles";
+        prevNode.appendChild(dynamicStyle);
+        dynamicStyle.textContent = `
+        .xml-finde-container{
+        max-height: 380px;
+        overflow-y: auto;
+        padding: 8px;
+        background: #f9f9f9;
+        border-radius: 5px;
+        font-family: cursive;
+        white-space: white-space;
+        word-break: break-word;
+        scrollbar-width: thin;
+        scrollbar-color: #999 #f9f9f9;
+        text-align: start;
+        }
+
+        .xml-tree-container::-webkit-scrollbar {
+            width: 8px;
+          }
+        .xml-tree-container::-webkit-scrollbar-thumb {
+            background: #999;
+            border-radius: 4px;
+          }
+        .xml-tree-container::-webkit-scrollbar-thumb:hover {
+            background: #777;
+          }
+        .searchInput{
+        width: 91%;
+        padding: 8px 12px;
+        margin-bottom: 8px;
+        border: 1px solid #aaa;
+        border-radius: 6px;
+        font-size: 14px;
+        background: #fff;
+        transition: border-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+        outline: none;
+        }
+        .result-container{
+        width: 300px;
+        height: 300px;
+        border: 1px solid #aaa;
+        border-radius: 6px;
+        font-family: cursive;
+        white-space: white-space;
+        word-break: break-word;
+        scrollbar-width: thin;
+        scrollbar-color: #999 #f9f9f9;
+        }
+        `;
+
+        // Создаём контейнер
+        const container = document.createElement("div");
+        container.classList.add("xml-finde-container");
+
+        // Строка поиска
+        const searchInput = document.createElement("input");
+        searchInput.classList.add("searchInput");
+        searchInput.type = "text";
+        searchInput.placeholder = "Введите путь к данным";
+
+        const resuleBox = document.createElement("div");
+        resuleBox.classList.add("result-container");
+
+        container.appendChild(searchInput);
+        container.appendChild(resuleBox);
+        prevNode.appendChild(container);
+
+        const xmlString = new XMLSerializer().serializeToString(processData[0].content);
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlString, "application/xml");
+
+        function findDataByPath(xmlDoc, tags) {
+          let currentElements = [xmlDoc.documentElement];
+          for (const tag of tags) {
+            const newElements = [];
+            for (const el of currentElements) {
+              const children = Array.from(el.getElementsByTagName(tag));
+              newElements.push(...children);
+            }
+            if (newElements.length === 0) return [];
+            currentElements = newElements;
+          }
+          return currentElements.map((el) => el.textContent.trim()).filter(Boolean);
+        }
+
+        function updateResults(path) {
+          const tags = path.split("/").map((t) => t.replace(/<|>/g, "").trim());
+          const results = [];
+
+          processData.forEach((file) => {
+            try {
+              const data = findDataByPath(file.content, tags);
+              if (data.length > 0) {
+                results.push({
+                  filename: file.filename,
+                  data: data.join("; "), // Разделитель для множественных значений
+                });
+              }
+            } catch (error) {
+              console.error(`Ошибка в файле ${file.filename}:`, error);
+            }
+          });
+
+          // Обновляем данные в Processing
+          nodesMap.get(idx).Processing.data[1] = {
+            flag: 1,
+            data: results,
+          };
+
+          // Отрисовываем результаты в интерфейсе
+          resuleBox.innerHTML = results
+            .map(
+              (r) =>
+                `<div class="result-item">
+                <strong>${r.filename}:</strong><br>
+                ${r.data || "Данные не найдены"}
+            </div>`
+            )
+            .join("");
+        }
+
+        searchInput.addEventListener("input", function (e) {
+          const searchPath = e.target.value.trim();
+          if (searchPath === "") {
+            resuleBox.innerHTML = "";
+            nodesMap.get(idx).Processing.data[1] = { flag: 0, data: [] };
+            return;
+          }
+          updateResults(searchPath);
+        });
+      }
+
+      function prewdataNode(placeDataPoint, idx) {
+        nodesMap.get(idx).Processing.status = "waiting";
+
+        const node = document.querySelector(`.node-el[data-number_index="${idx}"]`);
+        const prevNode = node.querySelector(".preview-result");
+
+        prevNode.innerHTML = ""; // Очищаем перед добавлением
+
+        prevNode.textContent = placeDataPoint;
+      }
+
+      //#endregion function node
+    </script>
+  </body>
+</html>

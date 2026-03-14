@@ -1,0 +1,2723 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AST Visualizer - Babel Parser</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.28.3/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: #0f0f0f;
+        color: #fff;
+        overflow: hidden;
+      }
+
+      .container {
+        display: flex;
+        height: 100vh;
+        position: relative;
+      }
+
+      /* Панель редактора */
+      .editor-panel {
+        width: 45%;
+        background: #1e1e1e;
+        border-right: 1px solid #333;
+        display: flex;
+        flex-direction: column;
+        transition: width 0.3s ease;
+        z-index: 100;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
+      }
+
+      .editor-panel.collapsed {
+        width: 60px;
+      }
+
+      .panel-header {
+        padding: 15px;
+        background: #252526;
+        border-bottom: 1px solid #333;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .panel-title {
+        font-weight: 600;
+        color: #e0e0e0;
+      }
+
+      .toggle-btn {
+        background: none;
+        border: none;
+        color: #ccc;
+        cursor: pointer;
+        padding: 5px;
+        border-radius: 3px;
+        transition: background 0.2s;
+      }
+
+      .toggle-btn:hover {
+        background: #333;
+        color: #fff;
+      }
+
+      .editor-container {
+        flex: 1;
+        position: relative;
+        overflow: hidden;
+      }
+
+      #codeEditor {
+        width: 100%;
+        height: 100%;
+        background: #1e1e1e;
+        color: #d4d4d4;
+        border: none;
+        padding: 20px;
+        font-family: "Consolas", "Monaco", monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        resize: none;
+        outline: none;
+      }
+
+      .editor-actions {
+        padding: 15px;
+        background: #252526;
+        border-top: 1px solid #333;
+        display: flex;
+        gap: 10px;
+      }
+
+      .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+
+      .btn-primary {
+        background: #007acc;
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: #0062a3;
+      }
+
+      .btn-secondary {
+        background: #2d2d2d;
+        color: #ccc;
+        border: 1px solid #444;
+      }
+
+      .btn-secondary:hover {
+        background: #3d3d3d;
+        color: #fff;
+      }
+
+      /* Панель визуализации */
+      .visualization-panel {
+        flex: 1;
+        position: relative;
+        background: #0f0f0f;
+      }
+
+      #astNetwork {
+        width: 100%;
+        height: 100%;
+      }
+
+      .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #333;
+        border-top: 4px solid #007acc;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .status-bar {
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: #007acc;
+        padding: 8px 15px;
+        font-size: 12px;
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .error-message {
+        background: #ff4444;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 4px;
+        margin: 10px;
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        max-width: 400px;
+      }
+
+      /* Адаптивность */
+      @media (max-width: 1200px) {
+        .editor-panel {
+          width: 50%;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .container {
+          flex-direction: column;
+        }
+        .editor-panel {
+          width: 100%;
+          height: 40%;
+        }
+        .editor-panel.collapsed {
+          width: 100%;
+          height: 60px;
+        }
+      }
+
+      /* Стили для ползунка прокрутки */
+      #codeEditor::-webkit-scrollbar {
+        width: 8px; /* Тонкая ширина ползунка */
+      }
+
+      #codeEditor::-webkit-scrollbar-track {
+        background: transparent; /* Прозрачный фон дорожки */
+      }
+
+      #codeEditor::-webkit-scrollbar-thumb {
+        background: rgba(100, 100, 100, 0.4); /* Темно-серый с прозрачностью */
+        border-radius: 4px; /* Закругленные углы */
+        border: none; /* Убираем рамку */
+      }
+
+      #codeEditor::-webkit-scrollbar-thumb:hover {
+        background: rgba(120, 120, 120, 0.6); /* Более светлый при наведении */
+      }
+
+      #codeEditor::-webkit-scrollbar-thumb:active {
+        background: rgba(140, 140, 140, 0.8); /* Еще светлее при активном состоянии */
+      }
+
+      /* Для Firefox */
+      #codeEditor {
+        scrollbar-width: thin; /* Тонкий скроллбар */
+        scrollbar-color: rgba(100, 100, 100, 0.4) transparent; /* Цвет ползунка и фона */
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Левая панель с редактором -->
+      <div class="editor-panel" id="editorPanel">
+        <div class="panel-header">
+          <span class="panel-title">JavaScript Code</span>
+          <button class="toggle-btn" id="toggleEditor">
+            <i class="fas fa-chevron-left"></i>
+          </button>
+        </div>
+        <div class="editor-container">
+          <textarea id="codeEditor" placeholder="Введите ваш JavaScript код здесь...">
+        // Пример кода
+        const resizer = document.getElementById("resizer");
+        const leftPanel = document.getElementById("content-container");
+
+        function initResizer() {
+            resizer.addEventListener("mousedown", function(e) {
+                e.preventDefault();
+                document.addEventListener("mousemove", resize);
+                document.addEventListener("mouseup", stopResize);
+            });
+
+            function resize(e) {
+                leftPanel.style.width = e.clientX + "px";
+            }
+
+            function stopResize() {
+                document.removeEventListener("mousemove", resize);
+            }
+        }
+
+        initResizer();
+        </textarea
+          >
+        </div>
+        <div class="editor-actions">
+          <button class="btn btn-primary" id="parseBtn"><i class="fas fa-sync"></i> Parse & Visualize</button>
+          <button class="btn btn-secondary" id="clearBtn"><i class="fas fa-trash"></i> Clear</button>
+        </div>
+      </div>
+
+      <!-- Правая панель с визуализацией -->
+      <div class="visualization-panel">
+        <div id="astNetwork"></div>
+        <div class="loading-overlay" id="loadingOverlay" style="display: none">
+          <div class="spinner"></div>
+          <div>Parsing and building AST graph...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <span id="statusInfo">Ready - Babel Parser v7.28.3 loaded</span>
+      <span>AST Visualizer v1.0</span>
+    </div>
+
+    <script>
+      // Элементы DOM и состояние приложения остаются прежними
+      const editorPanel = document.getElementById("editorPanel");
+      const toggleEditor = document.getElementById("toggleEditor");
+      const codeEditor = document.getElementById("codeEditor");
+      const parseBtn = document.getElementById("parseBtn");
+      const clearBtn = document.getElementById("clearBtn");
+      const astNetwork = document.getElementById("astNetwork");
+      const loadingOverlay = document.getElementById("loadingOverlay");
+      const statusInfo = document.getElementById("statusInfo");
+
+      let isEditorCollapsed = false;
+      let network = null;
+
+      // Инициализация и базовые функции остаются без изменений
+      function checkBabelLoaded() {
+        if (typeof Babel === "undefined" || !Babel.availablePlugins) {
+          showError("Babel Parser failed to load. Please refresh the page.");
+          parseBtn.disabled = true;
+          return false;
+        }
+        return true;
+      }
+
+      function init() {
+        if (checkBabelLoaded()) {
+          statusInfo.textContent = "Babel Parser v7.28.3 loaded successfully";
+        }
+        setupEventListeners();
+        loadInitialCode();
+      }
+
+      function setupEventListeners() {
+        toggleEditor.addEventListener("click", toggleEditorPanel);
+        parseBtn.addEventListener("click", parseAndVisualize);
+        clearBtn.addEventListener("click", clearEditor);
+
+        document.addEventListener("keydown", (e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+            e.preventDefault();
+            parseAndVisualize();
+          }
+        });
+      }
+
+      function loadInitialCode() {
+        const savedCode = localStorage.getItem("astVisualizerCode");
+        if (savedCode) {
+          codeEditor.value = savedCode;
+        }
+      }
+
+      function toggleEditorPanel() {
+        isEditorCollapsed = !isEditorCollapsed;
+        toggleEditor.innerHTML = isEditorCollapsed ? '<i class="fas fa-chevron-right"></i>' : '<i class="fas fa-chevron-left"></i>';
+
+        if (isEditorCollapsed) {
+          editorPanel.classList.toggle("collapsed", isEditorCollapsed);
+          codeEditor.style.display = "none";
+          const head = editorPanel.querySelector(".panel-title");
+          head.style.display = "none";
+          const button = editorPanel.querySelector(".editor-actions");
+          button.style.display = "none";
+        } else {
+          // Добавляем обработчик события завершения перехода
+          const handleTransitionEnd = () => {
+            // Удаляем обработчик после выполнения
+            editorPanel.removeEventListener("transitionend", handleTransitionEnd);
+
+            visualizeElements();
+          };
+
+          editorPanel.addEventListener("transitionend", handleTransitionEnd);
+          editorPanel.classList.toggle("collapsed", isEditorCollapsed);
+        }
+
+        if (network) {
+          setTimeout(() => network.redraw(), 300);
+        }
+      }
+
+      function visualizeElements() {
+        codeEditor.style.display = "block";
+        const head = editorPanel.querySelector(".panel-title");
+        head.style.display = "block";
+        const button = editorPanel.querySelector(".editor-actions");
+        button.style.display = "block";
+      }
+
+      function clearEditor() {
+        if (confirm("Очистить редактор кода?")) {
+          codeEditor.value = "";
+          localStorage.removeItem("astVisualizerCode");
+          if (network) {
+            network.destroy();
+            network = null;
+          }
+          statusInfo.textContent = "Editor cleared";
+        }
+      }
+
+      async function parseAndVisualize() {
+        const code = codeEditor.value.trim();
+        if (!code) {
+          showError("Please enter some JavaScript code");
+          return;
+        }
+
+        if (!checkBabelLoaded()) {
+          return;
+        }
+
+        localStorage.setItem("astVisualizerCode", code);
+
+        try {
+          showLoading();
+          statusInfo.textContent = "Analyzing function relationships...";
+
+          // Парсим код
+          const ast = parseCodeWithBabel(code);
+
+          // Анализируем взаимосвязи функций
+          const functionRelations = analyzeFunctionRelations(ast);
+
+          statusInfo.textContent = "Building function relationship graph...";
+
+          // Визуализируем граф взаимосвязей
+          visualizeFunctionRelations(functionRelations);
+
+          // Вызываем при инициализации
+          addViewToggle(functionRelations);
+
+          statusInfo.textContent = `Found ${functionRelations.nodes.length} functions with ${functionRelations.edges.length} relationships`;
+        } catch (error) {
+          console.error("Analysis error:", error);
+          showError(`Analysis Error: ${error.message}`);
+          statusInfo.textContent = "Analysis failed";
+        } finally {
+          hideLoading();
+        }
+      }
+
+      function parseCodeWithBabel(code) {
+        try {
+          const result = Babel.transform(code, {
+            ast: true,
+            code: false,
+            sourceType: "module",
+          });
+          return result.ast;
+        } catch (error) {
+          try {
+            const result = Babel.transform(code, {
+              ast: true,
+              code: false,
+              sourceType: "script",
+            });
+            return result.ast;
+          } catch (fallbackError) {
+            throw new Error(`Babel Parse Error: ${fallbackError.message}`);
+          }
+        }
+      }
+
+      // ОСНОВНАЯ ФУНКЦИЯ ДЛЯ АНАЛИЗА ВЗАИМОСВЯЗЕЙ
+      function analyzeFunctionRelations(ast) {
+        const nodes = [];
+        const edges = [];
+        const functionMap = new Map();
+        const scopeStack = [];
+        let nodeCounter = 0; // Добавляем счетчик для уникальных ID
+
+        // Шаг 1: Находим все объявления функций
+        function findFunctionDeclarations(node) {
+          if (!node) return;
+
+          if (node.type === "FunctionDeclaration" && node.id) {
+            const funcName = node.id.name;
+            const nodeId = `func_${nodeCounter++}`; // Уникальный ID
+
+            const funcNode = {
+              id: nodeId, // Используем уникальный ID вместо имени
+              originalId: funcName, // Сохраняем оригинальное имя
+              label: funcName,
+              title: `Function: ${funcName}`,
+              type: "function",
+              calls: [],
+              calledBy: [],
+              parameters: node.params ? node.params.map((param) => param.name || "unknown") : [],
+            };
+
+            nodes.push(funcNode);
+            functionMap.set(funcName, { node: funcNode, id: nodeId }); // Сохраняем оба идентификатора
+          }
+
+          // Аналогично для других типов объявлений функций...
+          if (node.type === "VariableDeclarator" && node.init && (node.init.type === "FunctionExpression" || node.init.type === "ArrowFunctionExpression")) {
+            const funcName = node.id.name;
+            const nodeId = `func_${nodeCounter++}`;
+
+            const funcNode = {
+              id: nodeId,
+              originalId: funcName,
+              label: funcName,
+              title: `Function Variable: ${funcName}`,
+              type: "function",
+              calls: [],
+              calledBy: [],
+              parameters: node.init.params ? node.init.params.map((param) => param.name || "unknown") : [],
+            };
+
+            nodes.push(funcNode);
+            functionMap.set(funcName, { node: funcNode, id: nodeId });
+          }
+
+          // Рекурсивный обход...
+          for (const key in node) {
+            if (["type", "loc", "start", "end", "extra"].includes(key)) continue;
+
+            const value = node[key];
+            if (Array.isArray(value)) {
+              value.forEach(findFunctionDeclarations);
+            } else if (value && typeof value === "object") {
+              findFunctionDeclarations(value);
+            }
+          }
+        }
+
+        // Шаг 2: Анализируем вызовы функций
+        function analyzeFunctionCalls(node, currentFunction = null) {
+          if (!node) return;
+
+          if (node.type === "CallExpression") {
+            let calleeName = "";
+
+            if (node.callee.type === "Identifier") {
+              calleeName = node.callee.name;
+            } else if (node.callee.type === "MemberExpression" && node.callee.property.type === "Identifier") {
+              calleeName = `${node.callee.object.name || "object"}.${node.callee.property.name}`;
+            }
+
+            if (calleeName && currentFunction && functionMap.has(calleeName)) {
+              const callerInfo = functionMap.get(currentFunction);
+              const calleeInfo = functionMap.get(calleeName);
+
+              const args = node.arguments.map((arg) => {
+                if (arg.type === "Identifier") return arg.name;
+                if (arg.type === "Literal") return arg.value;
+                return "complex";
+              });
+
+              const edge = {
+                from: callerInfo.id, // Используем ID вместо имени
+                to: calleeInfo.id, // Используем ID вместо имени
+                label: `args: ${args.join(", ")}`,
+                arrows: "to",
+                value: 1,
+                args: args,
+              };
+
+              edges.push(edge);
+
+              if (!callerInfo.node.calls.includes(calleeName)) {
+                callerInfo.node.calls.push(calleeName);
+              }
+              if (!calleeInfo.node.calledBy.includes(currentFunction)) {
+                calleeInfo.node.calledBy.push(currentFunction);
+              }
+            }
+          }
+
+          // Входим в новую функцию (новую область видимости)
+          if (node.type === "FunctionDeclaration" && node.id) {
+            scopeStack.push(node.id.name);
+          }
+
+          // Рекурсивный обход
+          for (const key in node) {
+            if (["type", "loc", "start", "end", "extra"].includes(key)) continue;
+
+            const value = node[key];
+            const currentScope = scopeStack.length > 0 ? scopeStack[scopeStack.length - 1] : null;
+
+            if (Array.isArray(value)) {
+              value.forEach((child) => analyzeFunctionCalls(child, currentScope));
+            } else if (value && typeof value === "object") {
+              analyzeFunctionCalls(value, currentScope);
+            }
+          }
+
+          // Выходим из функции
+          if (node.type === "FunctionDeclaration" && node.id) {
+            scopeStack.pop();
+          }
+        }
+
+        // Выполняем анализ
+        findFunctionDeclarations(ast);
+        analyzeFunctionCalls(ast);
+
+        return { nodes, edges };
+      }
+
+      // ВИЗУАЛИЗАЦИЯ ГРАФА ВЗАИМОСВЯЗЕЙ
+      function visualizeFunctionRelations(functionRelations) {
+        const container = astNetwork;
+
+        // Очищаем контейнер перед созданием новой визуализации
+        container.innerHTML = "";
+
+        // Создаем легенду
+        const visualizationPanel = document.querySelector(".visualization-panel");
+        const Legend = visualizationPanel.querySelector(".Main-legend");
+
+        if (!Legend) {
+          createLegend(container);
+        }
+        // Подготавливаем данные для визуализации с улучшенным стилем
+        const visNodes = functionRelations.nodes.map((node) => {
+          const totalConnections = node.calledBy.length + node.calls.length;
+          const isMainFunction = node.calledBy.length === 0 && node.calls.length > 0;
+          const isUtility = node.calls.length === 0 && node.calledBy.length > 0;
+          const importanceLevel = totalConnections;
+
+          // Определяем форму в зависимости от важности
+          let shape;
+          if (importanceLevel > 15) shape = "star";
+          else if (importanceLevel > 8) shape = "diamond";
+          else if (importanceLevel > 3) shape = "triangle";
+          else shape = "circle";
+
+          // Динамический размер на основе важности
+          const baseSize = 25;
+          const sizeIncrement = Math.min(importanceLevel * 1.5, 30);
+          const nodeSize = baseSize + sizeIncrement;
+
+          // Динамический размер шрифта
+          const baseFontSize = 14;
+          const fontSize = baseFontSize + Math.min(importanceLevel * 0.5, 6);
+
+          return {
+            id: node.id,
+            label: node.label.length > 20 ? node.label.substring(0, 17) + "..." : node.label,
+            title: createNodeTooltip(node),
+            startLine: node.startLine,
+            endLine: node.endLine,
+            shape: shape,
+            color: {
+              background: isMainFunction ? "#ff6b6b" : isUtility ? "#4ecdc4" : "#45b7d1",
+              border: isMainFunction ? "#c62828" : isUtility ? "#00695c" : "#0277bd",
+              highlight: {
+                background: isMainFunction ? "#ff8a80" : isUtility ? "#80cbc4" : "#81d4fa",
+                border: isMainFunction ? "#b71c1c" : isUtility ? "#004d40" : "#01579b",
+              },
+            },
+            font: {
+              size: fontSize,
+              face: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+              color: "#ffffff",
+              bold: true,
+              strokeWidth: 2,
+              strokeColor: "rgba(0, 0, 0, 0.6)",
+            },
+            margin: 10,
+            shadow: {
+              enabled: true,
+              color: "rgba(0,0,0,0.3)",
+              size: 10,
+              x: 2,
+              y: 2,
+            },
+            borderWidth: 3,
+            size: nodeSize,
+            shapeProperties: {
+              useBorderWithImage: true,
+              interpolation: false,
+            },
+            physics: true,
+            mass: 1 + importanceLevel * 0.1, // Более важные узлы менее подвижны
+          };
+        });
+
+        const visEdges = functionRelations.edges.map((edge) => ({
+          from: edge.from,
+          to: edge.to,
+          label: edge.label || "call",
+          title: `Call from ${edge.from} to ${edge.to}\nArguments: ${edge.args.join(", ") || "none"}`,
+          arrows: {
+            to: {
+              enabled: true,
+              scaleFactor: 1.3,
+              type: "arrow",
+            },
+            middle: {
+              enabled: false,
+            },
+            from: {
+              enabled: false,
+            },
+          },
+          color: {
+            color: getEdgeColor(edge),
+            opacity: 0.8,
+            highlight: "#e91e63",
+          },
+          font: {
+            size: 11,
+            color: "#37474f",
+            face: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+            strokeWidth: 3,
+            strokeColor: "rgba(255, 255, 255, 0.7)",
+            align: "top",
+          },
+          smooth: {
+            enabled: true,
+            type: "cubicBezier",
+            roundness: 0.3,
+          },
+          width: 2 + edge.args.length * 0.2, // Толщина в зависимости от количества аргументов
+          dashes: edge.args.length === 0 ? [5, 5] : false,
+          selectionWidth: 4,
+          hoverWidth: 3.5,
+          animation: {
+            duration: 1500,
+            easingFunction: "easeInOutQuad",
+          },
+        }));
+
+        const data = {
+          nodes: new vis.DataSet(visNodes),
+          edges: new vis.DataSet(visEdges),
+        };
+
+        const options = {
+          layout: {
+            improvedLayout: true,
+            hierarchical: {
+              enabled: true,
+              direction: "LR",
+              sortMethod: "directed",
+              levelSeparation: 400,
+              nodeSpacing: 200,
+              treeSpacing: 300,
+              blockShifting: true,
+              edgeMinimization: true,
+              parentCentralization: true,
+            },
+          },
+          physics: {
+            enabled: true,
+            hierarchicalRepulsion: {
+              centralGravity: 0.0,
+              springLength: 200,
+              springConstant: 0.01,
+              nodeDistance: 250,
+              damping: 0.09,
+            },
+            stabilization: {
+              enabled: true,
+              iterations: 1500,
+              updateInterval: 25,
+              onlyDynamicEdges: false,
+              fit: true,
+            },
+            timestep: 0.35,
+            adaptiveTimestep: true,
+            solver: "hierarchicalRepulsion",
+          },
+          interaction: {
+            hover: true,
+            hoverConnectedEdges: true,
+            tooltipDelay: 100,
+            navigationButtons: true,
+            keyboard: {
+              enabled: true,
+              speed: { x: 5, y: 5, zoom: 0.05 },
+              bindToWindow: true,
+            },
+            zoomView: true,
+            dragView: true,
+            dragNodes: true,
+            selectable: true,
+            selectConnectedEdges: true,
+            multiselect: true,
+          },
+          nodes: {
+            shapeProperties: {
+              interpolation: false,
+              useBorderWithImage: true,
+            },
+            borderWidth: 3,
+            shadow: true,
+            scaling: {
+              min: 20,
+              max: 50,
+              label: {
+                enabled: true,
+                min: 12,
+                max: 24,
+                drawThreshold: 8,
+                maxVisible: 25,
+              },
+            },
+            physics: true,
+          },
+          edges: {
+            chosen: {
+              edge: function (values, id, selected, hovering) {
+                values.width = values.width * 1.5;
+                values.color = values.color;
+              },
+            },
+            labelHighlightBold: true,
+            selectionWidth: 4,
+            hoverWidth: 3.5,
+            smooth: {
+              enabled: true,
+              type: "cubicBezier",
+              roundness: 0.3,
+            },
+            arrows: {
+              to: {
+                scaleFactor: 1.3,
+              },
+            },
+          },
+          groups: {
+            main: {
+              color: {
+                background: "#ff6b6b",
+                border: "#c62828",
+                highlight: {
+                  background: "#ff8a80",
+                  border: "#b71c1c",
+                },
+              },
+            },
+            utility: {
+              color: {
+                background: "#4ecdc4",
+                border: "#00695c",
+                highlight: {
+                  background: "#80cbc4",
+                  border: "#004d40",
+                },
+              },
+            },
+            regular: {
+              color: {
+                background: "#45b7d1",
+                border: "#0277bd",
+                highlight: {
+                  background: "#81d4fa",
+                  border: "#01579b",
+                },
+              },
+            },
+          },
+          autoResize: true,
+          height: "100%",
+          width: "100%",
+          configure: {
+            enabled: false,
+            filter: "nodes,edges",
+            showButton: true,
+          },
+        };
+
+        if (network) {
+          network.destroy();
+        }
+
+        network = new vis.Network(container, data, options);
+
+        // Добавляем панель управления
+        addControlPanel(container, network);
+
+        const callHistory = CallHistory(container, network, functionRelations);
+
+        // Обработчики событий с улучшенной обратной связью
+        network.on("doubleClick", (params) => {
+          if (params.nodes.length === 1) {
+            const nodeId = params.nodes[0];
+            const node = functionRelations.nodes.find((n) => n.id === nodeId);
+
+            if (node) {
+              // Находим функцию в тексте и выделяем ее
+              highlightFunctionInEditor(node.label, node.startLine, node.endLine);
+            }
+          }
+        });
+
+        network.on("hoverNode", (params) => {
+          const nodeId = params.node;
+          const node = functionRelations.nodes.find((n) => n.id === nodeId);
+          if (node) {
+            statusInfo.textContent = `📋 ${node.label} | 📞 Calls: ${node.calls.length} | 📥 Called by: ${node.calledBy.length} | 🎯 Parameters: ${node.parameters.length}`;
+            statusInfo.style.backgroundColor = "#2d3436";
+          }
+        });
+
+        network.on("selectNode", (params) => {
+          if (params.nodes.length === 1) {
+            const nodeId = params.nodes[0];
+            const node = functionRelations.nodes.find((n) => n.id === nodeId);
+            if (node) {
+              highlightConnectedNodes(network, nodeId);
+              statusInfo.textContent = `✅ Selected: ${node.label} - Parameters: [${node.parameters.join(", ")}]`;
+              statusInfo.style.backgroundColor = "#27ae60";
+            }
+          }
+        });
+
+        network.on("deselectNode", () => {
+          network.unselectAll();
+          statusInfo.textContent = "🟢 Ready - Click on nodes to see details";
+          statusInfo.style.backgroundColor = "#2d3436";
+        });
+
+        network.on("blurNode", () => {
+          statusInfo.textContent = "👆 Hover over nodes to see information";
+          statusInfo.style.backgroundColor = "#2d3436";
+        });
+
+        // Адаптация под размер контейнера
+        network.on("resize", () => {
+          network.redraw();
+        });
+
+        // Центрируем view после стабилизации
+        network.on("stabilizationIterationsDone", () => {
+          network.fit({ animation: { duration: 1000, easingFunction: "easeInOutQuad" } });
+          network.setOptions({ physics: true }); // ← ОТКЛЮЧАЕМ ФИЗИКУ
+        });
+      }
+
+      function visualizeFunctionRelations3D(functionRelations, options = {}) {
+        const { showLabels = true, nodeScale = 1.0, animationSpeed = 0.1, autoRotate = true, collisionPrevention = true } = options;
+
+        const container = astNetwork;
+        container.innerHTML = "";
+
+        // Создаем сцену Three.js
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a);
+
+        const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.z = 50;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        container.appendChild(renderer.domElement);
+
+        // Добавляем освещение
+        const ambientLight = new THREE.AmbientLight(0x404040, 2);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
+
+        // Создаем 3D узлы и связи
+        const nodeMeshes = [];
+        const edgeLines = [];
+        const nodeMap = new Map();
+        const labelDivs = [];
+        const labelContainer = document.createElement("div");
+        labelContainer.style.position = "absolute";
+        labelContainer.style.top = "0";
+        labelContainer.style.left = "0";
+        labelContainer.style.pointerEvents = "none";
+        container.appendChild(labelContainer);
+
+        // Функция для предотвращения коллизий
+        const preventCollisions = (positions, radius, maxAttempts = 100) => {
+          const newPositions = [...positions];
+          const k = 0.1; // коэффициент отталкивания
+
+          for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            let hasCollision = false;
+
+            for (let i = 0; i < newPositions.length; i++) {
+              for (let j = i + 1; j < newPositions.length; j++) {
+                const dist = new THREE.Vector3().subVectors(newPositions[i], newPositions[j]).length();
+                const minDist = radius[i] + radius[j] + 2;
+
+                if (dist < minDist) {
+                  hasCollision = true;
+                  const direction = new THREE.Vector3().subVectors(newPositions[i], newPositions[j]).normalize();
+                  const moveDistance = (minDist - dist) * k;
+
+                  newPositions[i].add(direction.clone().multiplyScalar(moveDistance));
+                  newPositions[j].sub(direction.clone().multiplyScalar(moveDistance));
+                }
+              }
+            }
+
+            if (!hasCollision) break;
+          }
+
+          return newPositions;
+        };
+
+        // Рассчитываем уровни вызовов для Z-координаты
+        const calculateCallLevels = (nodes, edges) => {
+          const levels = new Map();
+          const visited = new Set();
+
+          // Находим корневые узлы (те, которые никого не вызывают)
+          const rootNodes = nodes.filter((node) => node.calls.length === 0);
+
+          const assignLevels = (nodeId, level) => {
+            if (visited.has(nodeId)) return;
+            visited.add(nodeId);
+            levels.set(nodeId, level);
+
+            // Находим все узлы, которые вызывают этот узел
+            const callers = edges.filter((edge) => edge.to === nodeId).map((edge) => edge.from);
+            callers.forEach((callerId) => {
+              assignLevels(callerId, level + 1);
+            });
+          };
+
+          // Начинаем с корневых узлов
+          rootNodes.forEach((node) => {
+            assignLevels(node.id, 0);
+          });
+
+          // Для узлов без уровня (изолированные)
+          nodes.forEach((node) => {
+            if (!levels.has(node.id)) {
+              levels.set(node.id, 0);
+            }
+          });
+
+          return levels;
+        };
+
+        const callLevels = calculateCallLevels(functionRelations.nodes, functionRelations.edges);
+        const maxLevel = Math.max(...Array.from(callLevels.values()), 1);
+
+        // Создаем узлы
+        const nodePositions = [];
+        const nodeRadii = [];
+
+        functionRelations.nodes.forEach((node, index) => {
+          const level = callLevels.get(node.id) || 0;
+          const zPosition = -level * 15;
+
+          // Размер узла зависит от количества связей
+          const totalConnections = node.calledBy.length + node.calls.length;
+          const radius = (2 + Math.min(totalConnections * 0.5, 5)) * nodeScale;
+
+          // Цвет узла в зависимости от типа
+          let color;
+          if (node.calledBy.length === 0 && node.calls.length > 0) {
+            color = new THREE.Color(0xff6b6b); // main
+          } else if (node.calls.length === 0 && node.calledBy.length > 0) {
+            color = new THREE.Color(0x4ecdc4); // utility
+          } else {
+            color = new THREE.Color(0x45b7d1); // regular
+          }
+
+          // Распределяем узлы по спирали на каждом уровне
+          const angle = (index / functionRelations.nodes.length) * Math.PI * 2;
+          const radiusFactor = 20 + level * 5;
+          const position = new THREE.Vector3(Math.cos(angle) * radiusFactor, Math.sin(angle) * radiusFactor, zPosition);
+
+          nodePositions.push(position);
+          nodeRadii.push(radius);
+        });
+
+        // Применяем предотвращение коллизий
+        const finalPositions = collisionPrevention ? preventCollisions(nodePositions, nodeRadii) : nodePositions;
+
+        functionRelations.nodes.forEach((node, index) => {
+          const radius = nodeRadii[index];
+          const position = finalPositions[index];
+
+          // Цвет узла
+          let color;
+          if (node.calledBy.length === 0 && node.calls.length > 0) {
+            color = new THREE.Color(0xff6b6b);
+          } else if (node.calls.length === 0 && node.calledBy.length > 0) {
+            color = new THREE.Color(0x4ecdc4);
+          } else {
+            color = new THREE.Color(0x45b7d1);
+          }
+
+          // Создаем геометрию узла
+          const geometry = new THREE.SphereGeometry(radius, 32, 32);
+          const material = new THREE.MeshPhongMaterial({
+            color: color,
+            emissive: color.clone().multiplyScalar(0.2),
+            specular: new THREE.Color(0xffffff),
+            shininess: 100,
+          });
+
+          const mesh = new THREE.Mesh(geometry, material);
+          mesh.position.copy(position);
+          scene.add(mesh);
+          nodeMeshes.push(mesh);
+          nodeMap.set(node.id, { mesh, node, index });
+
+          // Создаем текстовые метки
+          if (showLabels) {
+            const labelDiv = document.createElement("div");
+            labelDiv.className = "node-label";
+            labelDiv.textContent = node.label;
+            labelDiv.style.position = "absolute";
+            labelDiv.style.color = "#ffffff";
+            labelDiv.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
+            labelDiv.style.padding = "2px 6px";
+            labelDiv.style.borderRadius = "3px";
+            labelDiv.style.fontSize = "12px";
+            labelDiv.style.whiteSpace = "nowrap";
+            labelDiv.style.display = "none";
+            labelContainer.appendChild(labelDiv);
+            labelDivs.push({ div: labelDiv, mesh: mesh });
+          }
+        });
+
+        // Создаем связи между узлами
+        functionRelations.edges.forEach((edge) => {
+          const fromNode = nodeMap.get(edge.from);
+          const toNode = nodeMap.get(edge.to);
+
+          if (fromNode && toNode) {
+            const points = [new THREE.Vector3().copy(fromNode.mesh.position), new THREE.Vector3().copy(toNode.mesh.position)];
+
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const material = new THREE.LineBasicMaterial({
+              color: 0x888888,
+              opacity: 0.6,
+              transparent: true,
+            });
+
+            const line = new THREE.Line(geometry, material);
+            scene.add(line);
+            edgeLines.push(line);
+          }
+        });
+
+        // Добавляем интерактивность
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let hoveredNode = null;
+
+        function onMouseMove(event) {
+          const rect = renderer.domElement.getBoundingClientRect();
+          mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+          mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        }
+
+        function onMouseClick() {
+          if (hoveredNode) {
+            const nodeData = Array.from(nodeMap.values()).find((data) => data.mesh === hoveredNode);
+            if (nodeData) {
+              highlightFunctionInEditor(nodeData.node.label, nodeData.node.startLine, nodeData.node.endLine);
+            }
+          }
+        }
+
+        container.addEventListener("mousemove", onMouseMove);
+        container.addEventListener("click", onMouseClick);
+
+        // Управление камерой
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let cameraRotation = { x: 0, y: 0 };
+        let cameraDistance = 50; // Начальная дистанция камеры
+
+        function onMouseDown(event) {
+          isDragging = true;
+          previousMousePosition = { x: event.clientX, y: event.clientY };
+        }
+
+        function onMouseUp() {
+          isDragging = false;
+        }
+
+        function onMouseDrag(event) {
+          if (!isDragging) return;
+
+          const deltaX = event.clientX - previousMousePosition.x;
+          const deltaY = event.clientY - previousMousePosition.y;
+
+          cameraRotation.y += deltaX * 0.01;
+          cameraRotation.x += deltaY * 0.01;
+
+          previousMousePosition = { x: event.clientX, y: event.clientY };
+        }
+
+        // Функция для зума колесиком мыши
+        function onMouseWheel(event) {
+          event.preventDefault();
+          const zoomSpeed = 0.1;
+          cameraDistance += event.deltaY * zoomSpeed;
+          // Ограничиваем дистанцию камеры
+          cameraDistance = Math.max(10, Math.min(200, cameraDistance));
+        }
+
+        container.addEventListener("mousedown", onMouseDown);
+        container.addEventListener("mouseup", onMouseUp);
+        container.addEventListener("mousemove", onMouseDrag);
+        container.addEventListener("wheel", onMouseWheel, { passive: false });
+
+        // Анимация нод - порядок вызова функций
+        const animationState = {
+          currentPathIndex: 0,
+          animationProgress: 0,
+          animationSpeed: 0.02,
+          isAnimating: false,
+        };
+
+        // Создаем цветовые материалы для анимации
+        const nodeMaterials = new Map();
+        const originalColors = new Map();
+
+        function initializeNodeMaterials() {
+          nodeMeshes.forEach((mesh, index) => {
+            const originalColor = mesh.material.color.clone();
+            originalColors.set(mesh, originalColor);
+
+            // Создаем новый материал с возможностью изменения эмиссии
+            const newMaterial = new THREE.MeshPhongMaterial({
+              color: originalColor,
+              emissive: new THREE.Color(0x000000),
+              emissiveIntensity: 0.2,
+              shininess: 30,
+            });
+
+            mesh.material = newMaterial;
+            nodeMaterials.set(mesh, newMaterial);
+          });
+        }
+
+        // Функция для запуска анимации пути вызова
+        function startCallPathAnimation(startNode) {
+          if (!startNode) return;
+
+          const callPath = [];
+          const visited = new Set();
+
+          // Рекурсивно собираем путь вызовов
+          function collectCalls(node) {
+            if (!node || visited.has(node)) return;
+
+            visited.add(node);
+            callPath.push(node);
+
+            const nodeData = Array.from(nodeMap.values()).find((data) => data.mesh === node);
+            if (nodeData) {
+              nodeData.node.calls.forEach((call) => {
+                const calledNode = Array.from(nodeMap.values()).find((data) => data.node.label === call);
+                if (calledNode && !visited.has(calledNode.mesh)) {
+                  collectCalls(calledNode.mesh);
+                }
+              });
+            }
+          }
+
+          collectCalls(startNode);
+
+          if (callPath.length > 0) {
+            animationState.currentPath = callPath;
+            animationState.currentPathIndex = 0;
+            animationState.animationProgress = 0;
+            animationState.isAnimating = true;
+          }
+        }
+
+        // Функция для обновления анимации нод
+        function updateNodeAnimation(delta) {
+          if (!animationState.isAnimating || !animationState.currentPath) return;
+
+          animationState.animationProgress += animationState.animationSpeed * delta * 60;
+
+          if (animationState.animationProgress >= 1) {
+            animationState.animationProgress = 0;
+            animationState.currentPathIndex = (animationState.currentPathIndex + 1) % animationState.currentPath.length;
+          }
+
+          // Сбрасываем все цвета к исходным
+          nodeMeshes.forEach((mesh) => {
+            const material = nodeMaterials.get(mesh);
+            if (material) {
+              material.emissive.set(0x000000);
+              material.emissiveIntensity = 0.2;
+            }
+          });
+
+          // Подсвечиваем текущую активную ноду
+          const currentMesh = animationState.currentPath[animationState.currentPathIndex];
+          if (currentMesh) {
+            const material = nodeMaterials.get(currentMesh);
+            if (material) {
+              // Плавное изменение цвета от синего к зеленому и обратно
+              const hue = (Math.sin(animationState.animationProgress * Math.PI * 2) + 1) / 2;
+              const color = new THREE.Color().setHSL(hue * 0.3 + 0.5, 1, 0.5);
+              material.emissive.copy(color);
+              material.emissiveIntensity = 0.8 + Math.sin(animationState.animationProgress * Math.PI * 2) * 0.2;
+            }
+          }
+
+          // Подсвечиваем следующую ноду в очереди (если есть)
+          const nextIndex = (animationState.currentPathIndex + 1) % animationState.currentPath.length;
+          const nextMesh = animationState.currentPath[nextIndex];
+          if (nextMesh) {
+            const material = nodeMaterials.get(nextMesh);
+            if (material) {
+              material.emissive.set(0x4444ff);
+              material.emissiveIntensity = 0.4;
+            }
+          }
+        }
+
+        // Анимация
+        const clock = new THREE.Clock();
+
+        function animate() {
+          requestAnimationFrame(animate);
+
+          const delta = clock.getDelta();
+
+          // Автоповорот камеры
+          if (autoRotate && !isDragging) {
+            cameraRotation.y += animationSpeed * delta;
+          }
+
+          // Позиция камеры с учетом зума
+          camera.position.x = cameraDistance * Math.sin(cameraRotation.y) * Math.cos(cameraRotation.x);
+          camera.position.y = cameraDistance * Math.sin(cameraRotation.x);
+          camera.position.z = cameraDistance * Math.cos(cameraRotation.y) * Math.cos(cameraRotation.x);
+          camera.lookAt(0, 0, 0);
+
+          // Обновление позиций меток
+          if (showLabels) {
+            labelDivs.forEach(({ div, mesh }) => {
+              const vector = mesh.position.clone();
+              vector.project(camera);
+
+              const rect = renderer.domElement.getBoundingClientRect();
+              const x = (vector.x * 0.5 + 0.5) * rect.width;
+              const y = (-vector.y * 0.5 + 0.5) * rect.height;
+
+              div.style.left = `${x}px`;
+              div.style.top = `${y}px`;
+            });
+          }
+
+          // Подсветка при наведении
+          raycaster.setFromCamera(mouse, camera);
+          const intersects = raycaster.intersectObjects(nodeMeshes);
+
+          if (intersects.length > 0) {
+            if (hoveredNode !== intersects[0].object) {
+              if (hoveredNode) {
+                const material = nodeMaterials.get(hoveredNode);
+                if (material) material.emissiveIntensity = 0.2;
+                if (showLabels) {
+                  const label = labelDivs.find((l) => l.mesh === hoveredNode);
+                  if (label) {
+                    label.div.style.display = "none";
+                  }
+                }
+              }
+              hoveredNode = intersects[0].object;
+              const material = nodeMaterials.get(hoveredNode);
+              if (material) material.emissiveIntensity = 0.8;
+
+              const nodeData = Array.from(nodeMap.values()).find((data) => data.mesh === hoveredNode);
+              if (nodeData) {
+                statusInfo.textContent = `📋 ${nodeData.node.label} | 📞 Calls: ${nodeData.node.calls.length} | 📥 Called by: ${nodeData.node.calledBy.length}`;
+                if (showLabels) {
+                  const label = labelDivs.find((l) => l.mesh === hoveredNode);
+                  if (label) {
+                    label.div.style.display = "block";
+                  }
+                }
+              }
+            }
+          } else if (hoveredNode) {
+            const material = nodeMaterials.get(hoveredNode);
+            if (material) material.emissiveIntensity = 0.2;
+            if (showLabels) {
+              const label = labelDivs.find((l) => l.mesh === hoveredNode);
+              if (label) {
+                label.div.style.display = "none";
+              }
+            }
+            hoveredNode = null;
+            statusInfo.textContent = "👆 Hover over nodes to see information";
+          }
+
+          // Легкая пульсация узлов
+          nodeMeshes.forEach((mesh, index) => {
+            mesh.scale.setScalar(1 + Math.sin(clock.elapsedTime * animationSpeed + index) * 0.05);
+          });
+
+          // Обновление анимации нод
+          updateNodeAnimation(delta);
+
+          renderer.render(scene, camera);
+        }
+
+        // Инициализируем материалы для анимации
+        initializeNodeMaterials();
+
+        animate();
+
+        // Обработка изменения размера
+        function onWindowResize() {
+          camera.aspect = container.clientWidth / container.clientHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        window.addEventListener("resize", onWindowResize);
+
+        // Возвращаем методы управления
+        return {
+          updateOptions(newOptions) {
+            Object.assign(options, newOptions);
+
+            // Обновление масштаба узлов
+            nodeMeshes.forEach((mesh, index) => {
+              const nodeData = Array.from(nodeMap.values()).find((data) => data.mesh === mesh);
+              if (nodeData) {
+                const totalConnections = nodeData.node.calledBy.length + nodeData.node.calls.length;
+                const newRadius = (2 + Math.min(totalConnections * 0.5, 5)) * options.nodeScale;
+                mesh.geometry = new THREE.SphereGeometry(newRadius, 32, 32);
+              }
+            });
+
+            // Обновление видимости меток
+            labelDivs.forEach(({ div }) => {
+              div.style.display = options.showLabels ? "none" : "none";
+            });
+          },
+
+          // Метод для запуска анимации вызова функций
+          startAnimationFromNode(nodeLabel) {
+            const nodeData = Array.from(nodeMap.values()).find((data) => data.node.label === nodeLabel);
+            if (nodeData) {
+              startCallPathAnimation(nodeData.mesh);
+            }
+          },
+
+          // Метод для остановки анимации
+          stopAnimation() {
+            animationState.isAnimating = false;
+            // Восстанавливаем исходные цвета
+            nodeMeshes.forEach((mesh) => {
+              const material = nodeMaterials.get(mesh);
+              if (material) {
+                material.emissive.set(0x000000);
+                material.emissiveIntensity = 0.2;
+              }
+            });
+          },
+
+          destroy() {
+            window.removeEventListener("resize", onWindowResize);
+            container.removeEventListener("mousemove", onMouseMove);
+            container.removeEventListener("click", onMouseClick);
+            container.removeEventListener("mousedown", onMouseDown);
+            container.removeEventListener("mouseup", onMouseUp);
+            container.removeEventListener("mousemove", onMouseDrag);
+            container.removeEventListener("wheel", onMouseWheel);
+
+            nodeMeshes.forEach((mesh) => scene.remove(mesh));
+            edgeLines.forEach((line) => scene.remove(line));
+            labelDivs.forEach(({ div }) => div.remove());
+
+            renderer.dispose();
+            container.removeChild(renderer.domElement);
+            container.removeChild(labelContainer);
+          },
+
+          getCameraPosition() {
+            return camera.position.clone();
+          },
+
+          setCameraPosition(x, y, z) {
+            camera.position.set(x, y, z);
+            camera.lookAt(0, 0, 0);
+            // Обновляем cameraDistance на основе новой позиции
+            cameraDistance = camera.position.length();
+          },
+        };
+      }
+
+      function cleanup3D() {
+        // Удаляем все слушатели событий
+        window.removeEventListener("resize", onWindowResize);
+        container.removeEventListener("mousemove", onMouseMove);
+        container.removeEventListener("click", onMouseClick);
+
+        // Останавливаем анимацию
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+        }
+
+        // Удаляем все объекты из сцены
+        if (scene) {
+          // Удаляем узлы
+          nodeMeshes.forEach((mesh) => {
+            if (mesh.geometry) mesh.geometry.dispose();
+            if (mesh.material) {
+              if (mesh.material.map) mesh.material.map.dispose();
+              mesh.material.dispose();
+            }
+            scene.remove(mesh);
+          });
+          nodeMeshes.length = 0;
+
+          // Удаляем связи
+          edgeLines.forEach((line) => {
+            if (line.geometry) line.geometry.dispose();
+            if (line.material) line.material.dispose();
+            scene.remove(line);
+          });
+          edgeLines.length = 0;
+
+          // Удаляем освещение
+          if (ambientLight) scene.remove(ambientLight);
+          if (directionalLight) scene.remove(directionalLight);
+        }
+
+        // Очищаем рендерер
+        if (renderer) {
+          renderer.dispose();
+          renderer.forceContextLoss();
+          if (renderer.domElement && renderer.domElement.parentNode) {
+            renderer.domElement.parentNode.removeChild(renderer.domElement);
+          }
+        }
+
+        // Очищаем карты и массивы
+        nodeMap.clear();
+
+        // Освобождаем ссылки на Three.js объекты
+        scene = null;
+        camera = null;
+        renderer = null;
+        raycaster = null;
+        ambientLight = null;
+        directionalLight = null;
+
+        // Восстанавливаем статус
+        statusInfo.textContent = "🟢 Ready - Click on nodes to see details";
+        statusInfo.style.backgroundColor = "#2d3436";
+
+        console.log("3D visualization cleaned up successfully");
+      }
+
+      // Добавляем переключатель между 2D и 3D
+      function addViewToggle(functionRelations) {
+        const toggleBtn = document.createElement("button");
+        toggleBtn.textContent = "3D View";
+        toggleBtn.style.top = "10px";
+        toggleBtn.style.right = "10px";
+        toggleBtn.style.zIndex = "1000";
+        toggleBtn.style.padding = "8px 16px";
+        toggleBtn.style.background = "#4ecdc4";
+        toggleBtn.style.color = "white";
+        toggleBtn.style.border = "none";
+        toggleBtn.style.borderRadius = "4px";
+        toggleBtn.style.cursor = "pointer";
+
+        let is3D = false;
+        let cleanup3D = null;
+
+        toggleBtn.addEventListener("click", () => {
+          is3D = !is3D;
+          toggleBtn.textContent = is3D ? "2D View" : "3D View";
+
+          // Вызываем cleanup только если это функция
+          if (typeof cleanup3D === "function") {
+            cleanup3D();
+          }
+
+          if (is3D) {
+            cleanup3D = visualizeFunctionRelations3D(functionRelations);
+          } else {
+            visualizeFunctionRelations(functionRelations);
+            // Сбрасываем cleanup3D для 2D режима, если нужно
+            cleanup3D = null;
+          }
+        });
+
+        const button = editorPanel.querySelector(".editor-actions");
+        button.appendChild(toggleBtn);
+      }
+
+      // Вспомогательные функции для улучшенной визуализации
+
+      // Функция для выделения функции в редакторе кода
+      function highlightFunctionInEditor(functionName, startLine, endLine) {
+        const codeEditor = document.getElementById("codeEditor");
+        const code = codeEditor.value;
+        const lines = code.split("\n");
+
+        // Если есть информация о строках начала/конца функции
+        if (startLine !== undefined && endLine !== undefined) {
+          // Вычисляем позиции начала и конца в тексте
+          let startPos = 0;
+          let endPos = code.length;
+
+          // Находим позицию начала функции
+          for (let i = 0; i < startLine - 1; i++) {
+            startPos += lines[i].length + 1; // +1 для символа новой строки
+          }
+
+          // Находим позицию конца функции
+          for (let i = 0; i < endLine; i++) {
+            endPos = 0;
+            for (let j = 0; j < i; j++) {
+              endPos += lines[j].length + 1;
+            }
+            endPos += lines[i].length;
+          }
+
+          // Устанавливаем выделение
+          codeEditor.focus();
+          codeEditor.setSelectionRange(startPos, endPos);
+
+          // Прокручиваем к выделенной области
+          codeEditor.scrollTop = codeEditor.scrollHeight * (startLine / lines.length);
+        } else {
+          // Альтернативный поиск по имени функции (если нет информации о строках)
+          const functionRegex = new RegExp(
+            `(function\\s+${functionName}|const\\s+${functionName}\\s*=\\s*function|let\\s+${functionName}\\s*=\\s*function|var\\s+${functionName}\\s*=\\s*function|${functionName}\\s*=\\s*function|class\\s+${functionName})`,
+            "g"
+          );
+          let match;
+
+          while ((match = functionRegex.exec(code)) !== null) {
+            const functionStart = match.index;
+
+            // Ищем начало тела функции
+            let braceCount = 0;
+            let functionEnd = functionStart;
+            let inFunction = false;
+
+            for (let i = functionStart; i < code.length; i++) {
+              if (code[i] === "{") {
+                braceCount++;
+                inFunction = true;
+              } else if (code[i] === "}") {
+                braceCount--;
+              }
+
+              if (inFunction && braceCount === 0) {
+                functionEnd = i + 1;
+                break;
+              }
+            }
+
+            // Выделяем функцию
+            codeEditor.focus();
+            codeEditor.setSelectionRange(functionStart, functionEnd);
+
+            // Прокручиваем к функции так, чтобы она начиналась с середины окна
+            const lineNumber = code.substring(0, functionStart).split("\n").length;
+            const lineHeight = codeEditor.scrollHeight / lines.length;
+            const editorHeight = codeEditor.clientHeight;
+
+            // Вычисляем позицию прокрутки: позиция строки минус половина высоты редактора
+            codeEditor.scrollTop = (lineNumber - 1) * lineHeight - editorHeight / 2;
+
+            // Ограничиваем, чтобы не уйти в отрицательные значения
+            codeEditor.scrollTop = Math.max(0, codeEditor.scrollTop);
+
+            break;
+          }
+        }
+
+        // Добавляем временное выделение оранжевым цветом
+        const originalBackground = codeEditor.style.backgroundColor;
+        codeEditor.style.backgroundColor = "#ffffff";
+
+        setTimeout(() => {
+          codeEditor.style.backgroundColor = originalBackground;
+        }, 100);
+      }
+
+      function createNodeTooltip(node) {
+        return `
+              🏷️ <b>${node.label}</b>
+              📋 Parameters: ${node.parameters.join(", ") || "none"}
+              📞 Calls: ${node.calls.join(", ") || "none"}
+              📥 Called by: ${node.calledBy.join(", ") || "none"}
+            `.trim();
+      }
+
+      function getEdgeColor(edge) {
+        // Разные цвета для разных типов вызовов (непрозрачные цвета)
+        if (edge.args.length > 3) return "#FF8C42"; // Много аргументов - яркий оранжевый
+        if (edge.args.length > 0) return "#2E8B57"; // С аргументами - насыщенный зеленый
+        return "#696969"; // Без аргументов - темно-серый
+      }
+
+      function createLegend(container) {
+        const legend = document.createElement("div");
+        legend.classList.add("Main-legend");
+        legend.style.cssText = `
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          background: #f8f9fa;
+          border: 2px solid #dee2e6;
+          padding: 15px;
+          border-radius: 8px;
+          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+          z-index: 1000;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          max-width: 280px;
+          color: #2d3436;
+          transition: all 0.3s ease;
+        `;
+
+        // Создаем контейнер для содержимого легенды
+        const content = document.createElement("div");
+        content.innerHTML = `
+          <h3 style="margin: 0 0 10px 0; color: #2d3436; border-bottom: 2px solid #dee2e6; padding-bottom: 5px;">📊 Легенда</h3>
+
+          <h4 style="margin: 10px 0 5px 0; color: #495057;">Типы функций:</h4>
+          <div style="display: flex; align-items: center; margin: 5px 0;">
+            <div style="width: 20px; height: 20px; background: #FF6B6B; border: 2px solid #DC3545; margin-right: 10px; border-radius: 3px;"></div>
+            <span>Главная функция (точка входа)</span>
+          </div>
+          <div style="display: flex; align-items: center; margin: 5px 0;">
+            <div style="width: 20px; height: 20px; background: #45B7D1; border: 2px solid #007BFF; margin-right: 10px; border-radius: 3px;"></div>
+            <span>Обычная функция</span>
+          </div>
+          <div style="display: flex; align-items: center; margin: 5px 0;">
+            <div style="width: 20px; height: 20px; background: #4ECDC4; border: 2px solid #20C997; margin-right: 10px; border-radius: 3px;"></div>
+            <span>Утилитная функция (лист)</span>
+          </div>
+
+          <h4 style="margin: 15px 0 5px 0; color: #495057; border-top: 1px solid #dee2e6; padding-top: 10px;">Формы узлов (важность):</h4>
+          <div style="display: flex; align-items: center; margin: 5px 0;">
+            <svg width="20" height="20" viewBox="0 0 20 20" style="margin-right: 10px;">
+              <polygon points="10,2 4,19 19,8 1,8 16,19" fill="#45B7D1" stroke="#007BFF" stroke-width="2"/>
+            </svg>
+            <span>Звезда - высокая важность (>10 связей)</span>
+          </div>
+          <div style="display: flex; align-items: center; margin: 5px 0;">
+          <svg width="20" height="20" viewBox="0 0 20 20" style="margin-right: 10px;">
+              <polygon points="10,2 18,10 10,18 2,10" fill="#45B7D1" stroke="#007BFF" stroke-width="2"/>
+          </svg>
+          <span>Ромб - средняя важность (6-10 связей)</span>
+          </div>
+          <div style="display: flex; align-items: center; margin: 5px 0;">
+            <svg width="20" height="20" viewBox="0 0 20 20" style="margin-right: 10px;">
+              <polygon points="10,2 18,18 2,18" fill="#45B7D1" stroke="#007BFF" stroke-width="2"/>
+            </svg>
+            <span>Треугольник - умеренная важность (3-5 связей)</span>
+          </div>
+          <div style="display: flex; align-items: center; margin: 5px 0;">
+            <svg width="20" height="20" viewBox="0 0 20 20" style="margin-right: 10px;">
+              <circle cx="10" cy="10" r="8" fill="#45B7D1" stroke="#007BFF" stroke-width="2"/>
+            </svg>
+            <span>Круг - низкая важность (0-2 связи)</span>
+          </div>
+
+          <h4 style="margin: 15px 0 5px 0; color: #495057; border-top: 1px solid #dee2e6; padding-top: 10px;">Цвета связей:</h4>
+          <div style="display: flex; align-items: center; margin: 5px 0;">
+            <div style="width: 20px; height: 4px; background: #2E8B57; margin-right: 10px;"></div>
+            <span>С аргументами</span>
+          </div>
+          <div style="display: flex; align-items: center; margin: 5px 0;">
+            <div style="width: 20px; height: 4px; background: #FF8C42; margin-right: 10px;"></div>
+            <span>Много аргументов (>3)</span>
+          </div>
+          <div style="display: flex; align-items: center; margin: 5px 0;">
+            <div style="width: 20px; height: 4px; background: #696969; margin-right: 10px;"></div>
+            <span>Без аргументов</span>
+          </div>
+
+          <div style="margin: 15px 0 0 0; border-top: 1px solid #dee2e6; padding-top: 10px; font-size: 12px; color: #6c757d;">
+            <strong>Примечание:</strong> Размер узла также зависит от важности функции
+          </div>
+        `;
+
+        // Создаем кнопку сворачивания
+        const toggleButton = document.createElement("button");
+        toggleButton.innerHTML = "−";
+        toggleButton.style.cssText = `
+          position: absolute;
+          top: 5px;
+          right: 5px;
+          width: 20px;
+          height: 20px;
+          border: none;
+          background: #6c757d;
+          color: white;
+          border-radius: 50%;
+          cursor: pointer;
+          font-size: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+          line-height: 1;
+        `;
+
+        let isCollapsed = false;
+
+        toggleButton.addEventListener("click", function () {
+          isCollapsed = !isCollapsed;
+
+          if (isCollapsed) {
+            content.style.display = "none";
+            toggleButton.innerHTML = "+";
+            legend.style.padding = "15px";
+            legend.style.maxWidth = "30px";
+            legend.style.overflow = "hidden";
+          } else {
+            content.style.display = "block";
+            toggleButton.innerHTML = "−";
+            legend.style.padding = "15px";
+            legend.style.maxWidth = "280px";
+            legend.style.overflow = "visible";
+          }
+        });
+
+        legend.appendChild(toggleButton);
+        legend.appendChild(content);
+        container.parentNode.appendChild(legend);
+
+        // Добавляем стили для кнопки при наведении
+        toggleButton.addEventListener("mouseenter", function () {
+          toggleButton.style.background = "#495057";
+        });
+
+        toggleButton.addEventListener("mouseleave", function () {
+          toggleButton.style.background = "#6c757d";
+        });
+      }
+
+      function addControlPanel(container, network) {
+        const controls = document.createElement("div");
+        controls.style.cssText = `
+              position: absolute;
+              top: 10px;
+              left: 10px;
+              background: white;
+              padding: 10px;
+              border-radius: 8px;
+              box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+              z-index: 1000;
+              display: flex;
+              gap: 10px;
+            `;
+
+        controls.innerHTML = `
+              <button onclick="network.fit()" style="padding: 8px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                🔍 Fit
+              </button>
+              <button onclick="exportWithHighResText()" style="padding: 8px 12px; background: #9b59b6; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                📍 Download
+              </button>
+            `;
+
+        container.parentNode.appendChild(controls);
+      }
+
+      function exportWithHighResText(scale = 2) {
+        const canvas = document.querySelector("canvas");
+        const tempCanvas = document.createElement("canvas");
+        const ctx = tempCanvas.getContext("2d");
+
+        // Постепенное увеличение для лучшего качества
+        tempCanvas.width = canvas.width * scale;
+        tempCanvas.height = canvas.height * scale;
+
+        // Многоэтапное масштабирование для лучшего качества
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+
+        // Рисуем в высоком разрешении
+        ctx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+
+        // Используем Blob для максимального качества
+        tempCanvas.toBlob(
+          function (blob) {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.download = "ultra-hd-graph.png";
+            link.href = url;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+          },
+          "image/png",
+          1.0
+        );
+      }
+
+      function highlightConnectedNodes(network, nodeId) {
+        const connectedNodes = network.getConnectedNodes(nodeId);
+        const allNodes = network.body.data.nodes.getIds();
+
+        // Сбрасываем прозрачность всех узлов
+        allNodes.forEach((id) => {
+          network.body.data.nodes.update({
+            id: id,
+            opacity: 0.3,
+          });
+        });
+
+        // Подсвечиваем выбранный узел и связанные
+        network.body.data.nodes.update({
+          id: nodeId,
+          opacity: 1,
+        });
+
+        connectedNodes.forEach((id) => {
+          network.body.data.nodes.update({
+            id: id,
+            opacity: 0.7,
+          });
+        });
+      }
+
+      // Вспомогательные функции
+      function showLoading() {
+        loadingOverlay.style.display = "flex";
+      }
+
+      function hideLoading() {
+        loadingOverlay.style.display = "none";
+      }
+
+      function showError(message) {
+        const errorDiv = document.createElement("div");
+        errorDiv.className = "error-message";
+        errorDiv.innerHTML = `
+              <strong>❌ Error:</strong> ${message}
+              <button style="margin-left: 10px; background: none; border: none; color: white; cursor: pointer;">
+                <i class="fas fa-times"></i>
+              </button>
+            `;
+
+        errorDiv.querySelector("button").addEventListener("click", () => {
+          errorDiv.remove();
+        });
+
+        document.body.appendChild(errorDiv);
+
+        setTimeout(() => {
+          if (errorDiv.parentNode) {
+            errorDiv.remove();
+          }
+        }, 5000);
+      }
+
+      // Сохраняем ссылку на предыдущий экземпляр
+      let callHistoryInstance = null;
+
+      function CallHistory(container, network, functionRelations) {
+        console.log("CallHistory", container, network, functionRelations);
+
+        // Создаем контейнер для панели истории
+        // Проверяем, существует ли уже панель
+        const existingPanel = document.getElementById("call-history-panel");
+        if (existingPanel) {
+          existingPanel.remove();
+        }
+
+        // Создаем контейнер для панели истории с уникальным ID
+        const historyPanel = document.createElement("div");
+        historyPanel.id = "call-history-panel";
+        historyPanel.style.cssText = `
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 255, 255, 0.95);
+        padding: 15px 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        z-index: 1000;
+        min-width: 300px;
+        max-width: 600px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      `;
+        // Собираем хронологию вызовов (простой пример - можно адаптировать под ваши данные)
+        const callHistory = generateCallHistory(functionRelations);
+
+        const searchButtonHTML = `<button id="searchConnectionsBtn" style="padding: 5px 10px; background: #3498db; color: black; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">🔍</button>`;
+
+        // Добавляем контейнер для поиска
+        const searchContainerHTML = `<div id="searchContainer" style="display: none; margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+          <input type="text" id="searchInput" placeholder="Поиск по имени функции..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 10px;">
+          <div id="searchResults" style="max-height: 200px; overflow-y: auto;"></div>
+      </div>`;
+
+        // Обновляем HTML historyPanel (добавляем кнопку и контейнер поиска)
+        historyPanel.innerHTML = `
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+              <div style="display: flex; align-items: center; gap: 15px;">
+                  <h3 style="margin: 0; color: #2d3436; font-size: 14px;">🕒 Call History Timeline</h3>
+                  <span id="currentStep" style="background: #3498db; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">
+                      Step 0/${callHistory.length - 1}
+                  </span>
+              </div>
+              ${searchButtonHTML}
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+              <button id="prevStep" style="padding: 5px 10px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer;">◀</button>
+              <input type="range" id="timelineSlider" min="0" max="${callHistory.length - 1}" value="0"
+                     style="flex: 1; height: 6px; border-radius: 3px; background: #ddd; outline: none;">
+              <button id="nextStep" style="padding: 5px 10px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer;">▶</button>
+              <button id="playPause" style="padding: 5px 10px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer;">▶ Play</button>
+          </div>
+          <div id="stepInfo" style="margin-top: 10px; font-size: 12px; color: #636e72; text-align: center;">
+              ${callHistory[0].description || "Initial state"}
+          </div>
+          ${searchContainerHTML}
+      `;
+
+        container.parentNode.appendChild(historyPanel);
+
+        const slider = document.getElementById("timelineSlider");
+        const currentStep = document.getElementById("currentStep");
+        const stepInfo = document.getElementById("stepInfo");
+        const prevBtn = document.getElementById("prevStep");
+        const nextBtn = document.getElementById("nextStep");
+        const playBtn = document.getElementById("playPause");
+
+        let isPlaying = false;
+        let playInterval = null;
+        let currentStepIndex = 0;
+
+        // Добавляем обработчик события для кнопки поиска
+        const searchBtn = document.getElementById("searchConnectionsBtn");
+        const searchContainer = document.getElementById("searchContainer");
+        const searchInput = document.getElementById("searchInput");
+        const searchResults = document.getElementById("searchResults");
+
+        // Функция обновления визуализации для текущего шага
+        function updateVisualization(stepIndex) {
+          const step = callHistory[stepIndex];
+          currentStepIndex = stepIndex;
+
+          // Обновляем UI
+          slider.value = stepIndex;
+          currentStep.textContent = `Step ${stepIndex}/${callHistory.length - 1}`;
+          stepInfo.textContent = step.description || `Call ${stepIndex}`;
+
+          // Сбрасываем все узлы к исходному состоянию
+          network.body.data.nodes.forEach((node) => {
+            network.body.data.nodes.update({
+              id: node.id,
+              color: {
+                background: getOriginalNodeColor(node.id, functionRelations),
+                border: getOriginalBorderColor(node.id, functionRelations),
+              },
+              opacity: 0.3,
+            });
+          });
+
+          // Сбрасываем все связи к исходному состоянию
+          network.body.data.edges.forEach((edge) => {
+            network.body.data.edges.update({
+              id: edge.id,
+              color: {
+                color: "#848484",
+                opacity: 0.3,
+              },
+              width: 1,
+            });
+          });
+
+          // Подсвечиваем активные на этом шаге узлы
+          step.activeNodes.forEach((nodeId) => {
+            network.body.data.nodes.update({
+              id: nodeId,
+              color: {
+                background: "#e74c3c",
+                border: "#c0392b",
+              },
+              opacity: 1,
+            });
+          });
+
+          // Подсвечиваем связи между активными узлами
+          if (step.activeNodes.length >= 2) {
+            // Находим все связи между активными узлами
+            const activeEdges = findEdgesBetweenNodes(step.activeNodes, network);
+
+            activeEdges.forEach((edgeId) => {
+              network.body.data.edges.update({
+                id: edgeId,
+                color: {
+                  color: "#e74c3c",
+                  opacity: 1,
+                },
+                width: 3,
+              });
+            });
+          }
+
+          // Обновляем кнопки
+          prevBtn.disabled = stepIndex === 0;
+          nextBtn.disabled = stepIndex === callHistory.length - 1;
+          prevBtn.style.background = stepIndex === 0 ? "#bdc3c7" : "#3498db";
+          nextBtn.style.background = stepIndex === callHistory.length - 1 ? "#bdc3c7" : "#3498db";
+        }
+
+        function findEdgesBetweenNodes(nodeIds, network) {
+          const edgesBetweenNodes = [];
+          const edges = network.body.data.edges.get();
+
+          edges.forEach((edge) => {
+            const fromNode = edge.from;
+            const toNode = edge.to;
+
+            // Проверяем, что оба конца связи находятся в списке активных узлов
+            if (nodeIds.includes(fromNode) && nodeIds.includes(toNode)) {
+              edgesBetweenNodes.push(edge.id);
+            }
+          });
+
+          return edgesBetweenNodes;
+        }
+
+        // Обработчики событий
+        slider.addEventListener("input", (e) => {
+          if (!isPlaying) {
+            updateVisualization(parseInt(e.target.value));
+          }
+        });
+
+        prevBtn.addEventListener("click", () => {
+          if (currentStepIndex > 0) {
+            updateVisualization(currentStepIndex - 1);
+          }
+        });
+
+        nextBtn.addEventListener("click", () => {
+          if (currentStepIndex < callHistory.length - 1) {
+            updateVisualization(currentStepIndex + 1);
+            physicsOff(network);
+          }
+        });
+
+        playBtn.addEventListener("click", () => {
+          if (isPlaying) {
+            physicsOn(network);
+            stopPlayback();
+            playBtn.textContent = "▶ Play";
+            playBtn.style.background = "#27ae60";
+          } else {
+            physicsOff(network);
+            startPlayback();
+            playBtn.textContent = "⏸ Pause";
+            playBtn.style.background = "#e74c3c";
+          }
+          isPlaying = !isPlaying;
+        });
+
+        searchBtn.addEventListener("click", () => {
+          const isVisible = searchContainer.style.display !== "none";
+          searchContainer.style.display = isVisible ? "none" : "block";
+          if (!isVisible) {
+            SearchConnections(""); // Показываем все связи при открытии
+            searchInput.focus();
+          }
+        });
+
+        // Функция поиска связей
+        function SearchConnections(searchTerm) {
+          searchResults.innerHTML = "";
+
+          // Получаем все уникальные имена функций
+          const allFunctions = new Set();
+          network.body.data.nodes.get().forEach((node) => {
+            allFunctions.add(node.label || node.id);
+          });
+
+          // Фильтруем по поисковому запросу
+          const filteredFunctions = Array.from(allFunctions).filter((funcName) => searchTerm === "" || funcName.toLowerCase().includes(searchTerm.toLowerCase()));
+
+          // Отображаем результаты с информацией о связях
+          filteredFunctions.forEach((funcName) => {
+            const resultItem = document.createElement("div");
+            resultItem.style.cssText = `
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            color: black;
+            background: white;
+            transition: all 0.2s ease;
+          `;
+
+            // Находим все узлы с этим именем
+            const matchingNodes = network.body.data.nodes.get().filter((node) => (node.label || node.id) === funcName);
+
+            const nodeIds = matchingNodes.map((node) => node.id);
+
+            // Получаем информацию о связях
+            const connectionInfo = getFunctionConnectionsInfo(nodeIds, network);
+
+            // Получаем детальную информацию о связях
+            const detailedConnections = getDetailedConnectionsInfo(nodeIds, network);
+
+            resultItem.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 8px; color: #2c3e50;">${funcName}</div>
+            <div style="font-size: 12px; color: #7f8c8d; margin-bottom: 8px;">
+              ${connectionInfo.calls > 0 ? `Вызывает: ${connectionInfo.calls} функций` : ""}
+              ${connectionInfo.calledBy > 0 ? `Вызывается: ${connectionInfo.calledBy} функциями` : ""}
+              ${connectionInfo.calls === 0 && connectionInfo.calledBy === 0 ? "Нет связей" : ""}
+            </div>
+            <button class="details-btn" style="
+              background: #3498db;
+              color: white;
+              border: none;
+              padding: 4px 8px;
+              border-radius: 4px;
+              font-size: 11px;
+              cursor: pointer;
+              transition: background 0.2s ease;
+            ">Подробнее</button>
+          `;
+
+            // Обработчик для кнопки "Подробнее"
+            const detailsBtn = resultItem.querySelector(".details-btn");
+            detailsBtn.addEventListener("click", (e) => {
+              e.stopPropagation(); // Предотвращаем всплытие события
+              showDetailedConnectionsModal(funcName, detailedConnections);
+            });
+
+            // Эффект при наведении на кнопку
+            detailsBtn.onmouseover = (e) => {
+              e.stopPropagation();
+              detailsBtn.style.background = "#2980b9";
+            };
+
+            detailsBtn.onmouseout = (e) => {
+              e.stopPropagation();
+              detailsBtn.style.background = "#3498db";
+            };
+
+            resultItem.onmouseover = () => {
+              resultItem.style.background = "#f8f9fa";
+              resultItem.style.boxShadow = "0 2px 4px rgba(0,0,0,0.1)";
+            };
+
+            resultItem.onmouseout = () => {
+              resultItem.style.background = "white";
+              resultItem.style.boxShadow = "none";
+            };
+
+            resultItem.addEventListener("click", () => {
+              // Подсвечиваем узлы и связи с показом вызывающих/вызываемых функций
+              highlightFunctionConnections(nodeIds, funcName);
+            });
+
+            searchResults.appendChild(resultItem);
+          });
+
+          if (filteredFunctions.length === 0) {
+            searchResults.innerHTML = "<div style='padding: 15px; text-align: center; color: #999;'>Функции не найдены</div>";
+          }
+        }
+
+        // Функция для получения детальной информации о связях
+        function getDetailedConnectionsInfo(nodeIds, network) {
+          const edges = network.body.data.edges.get();
+          const nodes = network.body.data.nodes.get();
+
+          const calls = []; // Функции, которые вызываются
+          const calledBy = []; // Функции, которые вызывают
+
+          nodeIds.forEach((nodeId) => {
+            // Функции, которые вызываются этой функцией
+            edges
+              .filter((edge) => edge.from === nodeId)
+              .forEach((edge) => {
+                const targetNode = nodes.find((n) => n.id === edge.to);
+                if (targetNode && !calls.includes(targetNode.label || targetNode.id)) {
+                  calls.push(targetNode.label || targetNode.id);
+                }
+              });
+
+            // Функции, которые вызывают эту функцию
+            edges
+              .filter((edge) => edge.to === nodeId)
+              .forEach((edge) => {
+                const sourceNode = nodes.find((n) => n.id === edge.from);
+                if (sourceNode && !calledBy.includes(sourceNode.label || sourceNode.id)) {
+                  calledBy.push(sourceNode.label || sourceNode.id);
+                }
+              });
+          });
+
+          return { calls, calledBy };
+        }
+
+        // Функция для показа модального окна с детальной информацией
+        function showDetailedConnectionsModal(functionName, connections) {
+          // Создаем модальное окно
+          const modal = document.createElement("div");
+          modal.style.cssText = `
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          background: white;
+          padding: 20px;
+          border-radius: 8px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+          z-index: 1000;
+          min-width: 400px;
+          max-width: 600px;
+          max-height: 80vh;
+          overflow-y: auto;
+        `;
+
+          // Создаем затемнение фона
+          const overlay = document.createElement("div");
+          overlay.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0,0,0,0.5);
+          z-index: 999;
+        `;
+
+          // Содержимое модального окна
+          modal.innerHTML = `
+          <div style="margin-bottom: 20px;">
+            <h3 style="margin: 0 0 15px 0; color: #2c3e50;">Детальная информация: ${functionName}</h3>
+
+            ${
+              connections.calledBy.length > 0
+                ? `
+              <div style="margin-bottom: 15px;">
+                <h4 style="margin: 0 0 8px 0; color: #f39c12;">Вызывается функциями (${connections.calledBy.length}):</h4>
+                <div style="max-height: 150px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                  ${connections.calledBy.map((func) => `<div style="padding: 4px; color:black; border-bottom: 1px solid #eee;">${func}</div>`).join("")}
+                </div>
+              </div>
+            `
+                : ""
+            }
+
+            ${
+              connections.calls.length > 0
+                ? `
+              <div style="margin-bottom: 15px;">
+                <h4 style="margin: 0 0 8px 0; color: #2ecc71;">Вызывает функции (${connections.calls.length}):</h4>
+                <div style="max-height: 150px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                  ${connections.calls.map((func) => `<div style="padding: 4px; color:black; border-bottom: 1px solid #eee;">${func}</div>`).join("")}
+                </div>
+              </div>
+            `
+                : ""
+            }
+
+            ${
+              connections.calls.length === 0 && connections.calledBy.length === 0
+                ? `
+              <div style="color: #7f8c8d; text-align: center; padding: 20px;">
+                Нет связей с другими функциями
+              </div>
+            `
+                : ""
+            }
+          </div>
+
+          <button style="
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            float: right;
+          ">Закрыть</button>
+          <div style="clear: both;"></div>
+        `;
+
+          // Обработчик закрытия
+          const closeBtn = modal.querySelector("button");
+          closeBtn.addEventListener("click", () => {
+            document.body.removeChild(modal);
+            document.body.removeChild(overlay);
+          });
+
+          // Закрытие по клику на overlay
+          overlay.addEventListener("click", () => {
+            document.body.removeChild(modal);
+            document.body.removeChild(overlay);
+          });
+
+          // Добавляем элементы на страницу
+          document.body.appendChild(overlay);
+          document.body.appendChild(modal);
+
+          // Фокус на кнопке закрытия
+          closeBtn.focus();
+        }
+
+        // Функция для получения информации о связях функции
+        function getFunctionConnectionsInfo(nodeIds, network) {
+          const edges = network.body.data.edges.get();
+          let calls = 0; // Сколько функций вызывает эта
+          let calledBy = 0; // Сколько функций вызываются этой
+
+          nodeIds.forEach((nodeId) => {
+            // Функции, которые вызываются этой функцией
+            calls += edges.filter((edge) => edge.from === nodeId).length;
+
+            // Функции, которые вызывают эту функцию
+            calledBy += edges.filter((edge) => edge.to === nodeId).length;
+          });
+
+          return { calls, calledBy };
+        }
+
+        // Функция для подсветки узлов и связей
+        function highlightFunctionConnections(nodeIds, functionName) {
+          const edges = network.body.data.edges.get();
+
+          // Сбрасываем все к исходному состоянию
+          resetNetworkAppearance();
+
+          // Находим все связанные узлы
+          const connectedNodeIds = new Set();
+          const relatedEdges = new Set();
+
+          nodeIds.forEach((nodeId) => {
+            connectedNodeIds.add(nodeId);
+
+            // Функции, которые вызываются этой функцией
+            edges
+              .filter((edge) => edge.from === nodeId)
+              .forEach((edge) => {
+                connectedNodeIds.add(edge.to);
+                relatedEdges.add(edge.id);
+              });
+
+            // Функции, которые вызывают эту функцию
+            edges
+              .filter((edge) => edge.to === nodeId)
+              .forEach((edge) => {
+                connectedNodeIds.add(edge.from);
+                relatedEdges.add(edge.id);
+              });
+          });
+
+          // Сохраняем оригинальные настройки шрифтов перед изменением
+          const originalFontSettings = {};
+          Array.from(connectedNodeIds).forEach((nodeId) => {
+            const node = network.body.data.nodes.get(nodeId);
+            originalFontSettings[nodeId] = {
+              color: node.font?.color || "#2c3e50",
+              size: node.font?.size || 12,
+              bold: node.font?.bold || false,
+            };
+          });
+
+          // Подсвечиваем основную функцию (только цвет)
+          nodeIds.forEach((nodeId) => {
+            network.body.data.nodes.update({
+              id: nodeId,
+              color: {
+                background: "#e74c3c", // Красный - основная функция
+                border: "#c0392b",
+              },
+            });
+          });
+
+          // Подсвечиваем связанные функции (только цвет)
+          Array.from(connectedNodeIds).forEach((nodeId) => {
+            if (!nodeIds.includes(nodeId)) {
+              const isCaller = edges.some((edge) => edge.to === nodeId && nodeIds.includes(edge.from));
+              const isCallee = edges.some((edge) => edge.from === nodeId && nodeIds.includes(edge.to));
+
+              let color = "#3498db"; // Синий по умолчанию
+
+              if (isCaller) {
+                color = "#f39c12"; // Оранжевый - функция, которая вызывает основную
+              } else if (isCallee) {
+                color = "#2ecc71"; // Зеленый - функция, которую вызывает основная
+              }
+
+              network.body.data.nodes.update({
+                id: nodeId,
+                color: {
+                  background: color,
+                  border: color === "#3498db" ? "#2980b9" : color === "#f39c12" ? "#d35400" : "#27ae60",
+                },
+              });
+            }
+          });
+
+          // Подсвечиваем связи (только цвет и толщину)
+          Array.from(relatedEdges).forEach((edgeId) => {
+            const edge = edges.find((e) => e.id === edgeId);
+            const isFromMain = nodeIds.includes(edge.from);
+            const isToMain = nodeIds.includes(edge.to);
+
+            let edgeColor = "#e74c3c";
+            if (isFromMain && !isToMain) {
+              edgeColor = "#2ecc71"; // Зеленый - вызов от основной функции
+            } else if (!isFromMain && isToMain) {
+              edgeColor = "#f39c12"; // Оранжевый - вызов к основной функции
+            }
+
+            network.body.data.edges.update({
+              id: edgeId,
+              color: {
+                color: edgeColor,
+                opacity: 1,
+              },
+              width: 3,
+            });
+          });
+
+          // Сохраняем оригинальные настройки для последующего восстановления
+          window._originalFontSettings = originalFontSettings;
+
+          // Обновляем заголовок с информацией о связях
+          const connectionInfo = getFunctionConnectionsInfo(nodeIds, network);
+          updateConnectionInfoHeader(functionName, connectionInfo);
+        }
+
+        function resetNetworkAppearance() {
+          // Восстанавливаем оригинальные цвета узлов
+          network.body.data.nodes.forEach((node) => {
+            network.body.data.nodes.update({
+              id: node.id,
+              color: {
+                background: getOriginalNodeColor(node.id, functionRelations),
+                border: getOriginalBorderColor(node.id, functionRelations),
+              },
+            });
+          });
+
+          // Восстанавливаем оригинальные настройки связей
+          network.body.data.edges.forEach((edge) => {
+            network.body.data.edges.update({
+              id: edge.id,
+              color: {
+                color: "#848484",
+                opacity: 0.7,
+              },
+              width: 1,
+            });
+          });
+
+          // Восстанавливаем оригинальные настройки шрифтов (если они были сохранены)
+          if (window._originalFontSettings) {
+            Object.keys(window._originalFontSettings).forEach((nodeId) => {
+              const fontSettings = window._originalFontSettings[nodeId];
+              network.body.data.nodes.update({
+                id: nodeId,
+                font: fontSettings,
+              });
+            });
+            delete window._originalFontSettings;
+          }
+        }
+
+        // Добавляем обработчик для поля ввода поиска
+        searchInput.addEventListener("input", (e) => {
+          SearchConnections(e.target.value);
+        });
+
+        // Функция для обновления заголовка с информацией о связях
+        function updateConnectionInfoHeader(functionName, connectionInfo) {
+          const infoText = `
+          Функция: <strong>${functionName}</strong> |
+          Вызывает: <span style="color: #2ecc71">${connectionInfo.calls}</span> функций |
+          Вызывается: <span style="color: #f39c12">${connectionInfo.calledBy}</span> функциями
+        `;
+
+          // Создаем или обновляем информационный заголовок
+          let infoHeader = document.getElementById("connection-info-header");
+          if (!infoHeader) {
+            infoHeader = document.createElement("div");
+            infoHeader.id = "connection-info-header";
+            infoHeader.style.cssText = `
+            padding: 10px;
+            background: #ecf0f1;
+            border-bottom: 2px solid #bdc3c7;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            color:black;
+          `;
+            searchResults.parentNode.insertBefore(infoHeader, searchResults);
+          }
+
+          infoHeader.innerHTML = infoText;
+        }
+
+        function startPlayback() {
+          stopPlayback();
+          playInterval = setInterval(() => {
+            if (currentStepIndex < callHistory.length - 1) {
+              updateVisualization(currentStepIndex + 1);
+            } else {
+              stopPlayback();
+            }
+          }, 1000); // 1 секунда на шаг
+        }
+
+        function stopPlayback() {
+          if (playInterval) {
+            clearInterval(playInterval);
+            playInterval = null;
+          }
+        }
+
+        // Инициализация
+        updateVisualization(0);
+
+        // Возвращаем функции для внешнего управления
+        return {
+          updateVisualization,
+          startPlayback,
+          stopPlayback,
+          destroy: () => {
+            stopPlayback();
+            // Удаляем все созданные элементы
+            if (historyPanel.parentNode) {
+              historyPanel.parentNode.removeChild(historyPanel);
+            }
+            // Удаляем модальные окна если они есть
+            const modal = document.getElementById("connections-modal");
+            const overlay = document.getElementById("modal-overlay");
+            if (modal) modal.remove();
+            if (overlay) overlay.remove();
+          },
+        };
+      }
+
+      // Вспомогательные функции CallHistory
+      function generateCallHistory(functionRelations) {
+        // Простая реализация - можно заменить на реальную логику вызовов
+        const history = [];
+
+        // Начальное состояние
+        history.push({
+          activeNodes: functionRelations.nodes.filter((node) => node.calledBy.length === 0).map((node) => node.id),
+          description: "Initial state - entry points",
+        });
+
+        // Имитация последовательности вызовов
+        functionRelations.edges.forEach((edge, index) => {
+          // Находим узлы по ID
+          const fromNode = functionRelations.nodes.find((n) => n.id === edge.from);
+          const toNode = functionRelations.nodes.find((n) => n.id === edge.to);
+
+          history.push({
+            activeNodes: [edge.from, edge.to],
+            currentCall: {
+              from: edge.from,
+              to: edge.to,
+              edgeId: edge.id,
+            },
+            description: `Call: ${fromNode.label} → ${toNode.label}`,
+          });
+        });
+
+        return history;
+      }
+
+      function getOriginalNodeColor(nodeId, functionRelations) {
+        const node = functionRelations.nodes.find((n) => n.id === nodeId);
+        if (!node) return "#45b7d1";
+
+        if (node.calledBy.length === 0 && node.calls.length > 0) return "#ff6b6b";
+        if (node.calls.length === 0 && node.calledBy.length > 0) return "#4ecdc4";
+        return "#45b7d1";
+      }
+
+      function getOriginalBorderColor(nodeId, functionRelations) {
+        const node = functionRelations.nodes.find((n) => n.id === nodeId);
+        if (!node) return "#2a92a8";
+
+        if (node.calledBy.length === 0 && node.calls.length > 0) return "#ee5253";
+        if (node.calls.length === 0 && node.calledBy.length > 0) return "#2a92a8";
+        return "#2a92a8";
+      }
+
+      function physicsOff(network) {
+        network.setOptions({ physics: false });
+      }
+
+      function physicsOn(network) {
+        network.setOptions({ physics: true });
+        network.stabilize(50); // Быстрая стабилизация
+      }
+
+      // Инициализация
+      init();
+    </script>
+  </body>
+</html>

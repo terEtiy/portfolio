@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<out:CoordinateMessage xmlns:out="http://asguf.mos.ru/rkis_gu/coordinate/v6/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+   <out:CoordinateDataMessage>
+      <out:Service>
+         <out:RegNum>345460748</out:RegNum>
+         <out:RegDate>2025-01-29T09:39:56+03:00</out:RegDate>
+         <out:ServiceNumber>0001-9000003-000262-0001781/25</out:ServiceNumber>
+         <out:ServicePrice xsi:nil="true"/>
+         <out:PrepareTargetDate xsi:nil="true"/>
+         <out:OutputTargetDate xsi:nil="true"/>
+         <out:Responsible>
+            <out:LastName>оператор Портала</out:LastName>
+            <out:FirstName>оператор Портала</out:FirstName>
+            <out:MiddleName>оператор Портала</out:MiddleName>
+            <out:JobTitle>оператор Портала</out:JobTitle>
+            <out:Phone>+7 (495) 539-55-55</out:Phone>
+            <out:Email>cpgu@mos.ru</out:Email>
+         </out:Responsible>
+         <out:Department>
+            <out:Name>Департамент информационных технологий города Москвы</out:Name>
+            <out:Code>2043</out:Code>
+            <out:Inn>7710878000</out:Inn>
+            <out:Ogrn>1107746943347</out:Ogrn>
+            <out:RegDate>2010-11-18T00:00:00</out:RegDate>
+            <out:SystemCode>9000003</out:SystemCode>
+         </out:Department>
+         <out:CreatedByDepartment>
+            <out:Name>ПГУ</out:Name>
+            <out:Code>1</out:Code>
+            <out:Inn>7710878000</out:Inn>
+            <out:Ogrn>1107746943347</out:Ogrn>
+            <out:RegDate>2009-11-18T00:00:00</out:RegDate>
+            <out:SystemCode>1</out:SystemCode>
+         </out:CreatedByDepartment>
+         <out:PrepareFactDate>2025-01-29T09:39:57+03:00</out:PrepareFactDate>
+         <out:OutputFactDate xsi:nil="true"/>
+      </out:Service>
+      <out:SignService Id="eff63832-83d1-458f-9af3-10bfc59c5275">
+         <out:ServiceTypeCode>262</out:ServiceTypeCode>
+         <out:Copies>1</out:Copies>
+         <out:Declarant xsi:type="out:RequestAccount">
+            <out:FullName>ФЕДЕРАЛЬНОЕ ГОСУДАРСТВЕННОЕ УНИТАРНОЕ ПРЕДПРИЯТИЕ "МОСКОВСКИЙ ЭНДОКРИННЫЙ ЗАВОД"</out:FullName>
+            <out:Name>ФГУП "ЭНДОФАРМ"</out:Name>
+            <out:Ogrn>1027700524840</out:Ogrn>
+            <out:OgrnDate xsi:nil="true"/>
+            <out:Inn>7722059711</out:Inn>
+            <out:InnDate xsi:nil="true"/>
+            <out:PostalAddress/>
+            <out:FactAddress/>
+            <out:Phone>(495) 234-61-92</out:Phone>
+            <out:EMail>mez@endopharm.ru</out:EMail>
+         </out:Declarant>
+         <out:CustomAttributes>
+            <ServiceProperties xmlns:ns1="http://asguf.mos.ru/rkis_gu/coordinate/v6_1/">
+               <type>2</type>
+               <zayv_pod>1</zayv_pod>
+               <yavl>2</yavl>
+               <type_arenda>3</type_arenda>
+               <cadastralnumber>77:04:0001020:48</cadastralnumber>
+               <address_type>true</address_type>
+               <address_okrug>0500</address_okrug>
+               <address_rayon>0510</address_rayon>
+               <zem_registered>1</zem_registered>
+               <zem_object>false</zem_object>
+               <info_others>0</info_others>
+               <gos_usl_type>1</gos_usl_type>
+               <contact_lastname>Кондратьев</contact_lastname>
+               <contact_firstname>Вячеслав</contact_firstname>
+               <contact_middlename>Анатольевич</contact_middlename>
+               <contact_phone>(977) 641-03-11</contact_phone>
+               <contact_email>kondrat122007@yandex.ru</contact_email>
+               <place>г.Москва,ул.Новохохловская,вл.25</place>
+               <address_okrug_PDF>Юго-Восточный административный округ</address_okrug_PDF>
+               <address_rayon_PDF>муниципальный округ Нижегородский</address_rayon_PDF>
+               <type_arenda_PDF>В аренде/пользовании иных лиц</type_arenda_PDF>
+            </ServiceProperties>
+         </out:CustomAttributes>
+      </out:SignService>
+      <out:Documents>
+         <out:ServiceDocument>
+            <out:DocCode>10002</out:DocCode>
+            <out:DocNumber>б/н</out:DocNumber>
+            <out:DocDate xsi:nil="true"/>
+            <out:ValidityPeriod xsi:nil="true"/>
+            <out:ListCount xsi:nil="true"/>
+            <out:CopyCount xsi:nil="true"/>
+            <out:DocFiles>
+               <out:CoordinateFileReference>
+                  <out:Id>5fb8c813-216f-45b5-806d-10c0111ac0ea</out:Id>
+                  <out:FileChecksum>DBDD6F5F14C6D1B03C02493418926D2632C96FA51EC91F9DDACAF93CAFCDD21B</out:FileChecksum>
+               </out:CoordinateFileReference>
+            </out:DocFiles>
+         </out:ServiceDocument>
+         <out:ServiceDocument>
+            <out:DocCode>7709</out:DocCode>
+            <out:DocNumber>б/н</out:DocNumber>
+            <out:DocDate xsi:nil="true"/>
+            <out:ValidityPeriod xsi:nil="true"/>
+            <out:ListCount xsi:nil="true"/>
+            <out:CopyCount xsi:nil="true"/>
+            <out:DocFiles>
+               <out:CoordinateFileReference>
+                  <out:Id>26f77acc-f5c1-4f0d-9307-f9981ad41482</out:Id>
+                  <out:FileChecksum>67484954558406C70C6D29EA3CF5A174713675C71B46AC91B3391483D653C283</out:FileChecksum>
+               </out:CoordinateFileReference>
+            </out:DocFiles>
+         </out:ServiceDocument>
+         <out:ServiceDocument>
+            <out:DocCode>7709</out:DocCode>
+            <out:DocNumber>б/н</out:DocNumber>
+            <out:DocDate xsi:nil="true"/>
+            <out:ValidityPeriod xsi:nil="true"/>
+            <out:ListCount xsi:nil="true"/>
+            <out:CopyCount xsi:nil="true"/>
+            <out:DocFiles>
+               <out:CoordinateFileReference>
+                  <out:Id>01a461fd-0226-4815-8ade-0b7b08d8a00f</out:Id>
+                  <out:FileChecksum>3E2D4161CE3215F3CED7BC1F6DF1DF821E767D8BC487D13FEFAD2FA53E2F16B4</out:FileChecksum>
+               </out:CoordinateFileReference>
+            </out:DocFiles>
+         </out:ServiceDocument>
+         <out:ServiceDocument>
+            <out:DocCode>7709</out:DocCode>
+            <out:DocNumber>б/н</out:DocNumber>
+            <out:DocDate xsi:nil="true"/>
+            <out:ValidityPeriod xsi:nil="true"/>
+            <out:ListCount xsi:nil="true"/>
+            <out:CopyCount xsi:nil="true"/>
+            <out:DocFiles>
+               <out:CoordinateFileReference>
+                  <out:Id>434a581c-cee9-47e3-8b5b-522b4dc29686</out:Id>
+                  <out:FileChecksum>6A75169B86ECEAE269D7D550F9690341A4F800C2AFEFE9DA9E2DB2E5F408334C</out:FileChecksum>
+               </out:CoordinateFileReference>
+            </out:DocFiles>
+         </out:ServiceDocument>
+      </out:Documents>
+   </out:CoordinateDataMessage>
+   <out:Files>
+      <out:CoordinateFile>
+         <out:Id>5fb8c813-216f-45b5-806d-10c0111ac0ea</out:Id>
+         <out:FileIdInStore>F6EAA614-81F8-49F3-96B5-20A416B8D52E</out:FileIdInStore>
+         <out:FileName>Кондратьев 327 госорганы, КЭП без ПД.pdf.zip</out:FileName>
+         <out:CmsSignature/>
+      </out:CoordinateFile>
+      <out:CoordinateFile>
+         <out:Id>26f77acc-f5c1-4f0d-9307-f9981ad41482</out:Id>
+         <out:FileIdInStore>944B76C6-C719-4FB7-A810-8F5B3D2641A5</out:FileIdInStore>
+         <out:FileName>77 04 0001020 48.zip</out:FileName>
+         <out:CmsSignature/>
+      </out:CoordinateFile>
+      <out:CoordinateFile>
+         <out:Id>01a461fd-0226-4815-8ade-0b7b08d8a00f</out:Id>
+         <out:FileIdInStore>8FEFC44E-7D84-40FB-9CE4-0A62327A39B2</out:FileIdInStore>
+         <out:FileName>Договор аренды ЗУ 48.zip</out:FileName>
+         <out:CmsSignature/>
+      </out:CoordinateFile>
+      <out:CoordinateFile>
+         <out:Id>434a581c-cee9-47e3-8b5b-522b4dc29686</out:Id>
+         <out:FileIdInStore>6D9D22E4-8FE2-44E8-BC06-9B1115109F2D</out:FileIdInStore>
+         <out:FileName>письмо по 48 участку.zip</out:FileName>
+         <out:CmsSignature/>
+      </out:CoordinateFile>
+   </out:Files>
+</out:CoordinateMessage>

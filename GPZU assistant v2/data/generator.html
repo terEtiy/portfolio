@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Генератор готовых ограничений</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(90deg, #cfecd0, #ffc5ca);
+        color: #333;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        overflow: hidden; /* Предотвращает прокрутку на странице */
+      }
+      .invisible-hover-area {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 300px; /* Увеличенный размер по ширине */
+        height: 100px; /* Увеличенный размер по высоте */
+        z-index: 999; /* Обеспечиваем, что этот div будет перед другими элементами */
+      }
+
+      .invisible-hover-area:hover .exit-button {
+        transform: translateX(310px) scale(1.05);
+        background-color: #0056b3;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      }
+
+      .exit-button {
+        display: inline-block;
+        padding: 12px 24px;
+        background-color: #007bff;
+        color: white;
+        text-decoration: none;
+        border-radius: 25px;
+        font-size: 16px;
+        font-weight: bold;
+        position: fixed;
+        top: 20px;
+        left: -300px;
+        z-index: 1000;
+        transition: transform 0.4s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+        transform: translateX(110px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      }
+
+      .exit-button:active {
+        transform: translateX(310px) scale(0.95);
+        background-color: #00408f;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      }
+      .container {
+        min-width: 500px;
+        min-height: 500px;
+        width: auto; /* Автоматическая ширина в зависимости от контента */
+        height: auto; /* Автоматическая высота в зависимости от контента */
+        max-width: 90%;
+        max-height: 90vh; /* Ограничиваем максимальную высоту */
+        background-color: white;
+        padding: 40px;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        position: relative;
+        overflow: auto; /* Добавляем прокрутку, если контент выходит за границы контейнера */
+      }
+      /* Стилизация полосы прокрутки */
+      .container::-webkit-scrollbar {
+        width: 10px; /* Ширина полоски */
+      }
+
+      .container::-webkit-scrollbar-track {
+        background: #f1f1f1; /* Цвет трека полоски */
+        border-radius: 8px;
+      }
+
+      .container::-webkit-scrollbar-thumb {
+        background-color: #bdddff; /* Цвет самой полоски */
+        border-radius: 10px; /* Закругление полоски */
+      }
+
+      .container::-webkit-scrollbar-thumb:hover {
+        background: #2784ff; /* Цвет полоски при наведении */
+      }
+
+      h1 {
+        font-size: 28px;
+        margin-bottom: 25px;
+        text-align: center;
+        color: #007bff;
+      }
+      .section {
+        margin-bottom: 25px;
+      }
+      .section h3 {
+        font-size: 20px;
+        margin-bottom: 15px;
+        color: #007bff;
+      }
+      .input-group {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+      .input-group label {
+        margin-right: 10px;
+        font-weight: 500;
+      }
+      input[type="text"] {
+        width: 100%;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        font-size: 16px;
+        box-sizing: border-box;
+        transition: border-color 0.3s ease;
+      }
+      input[type="text"]:focus {
+        border-color: #007bff;
+      }
+      .toggle-group {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        margin-top: 10px;
+      }
+      .toggle-group label {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+      }
+      .toggle-group input[type="radio"] {
+        display: none;
+      }
+      .toggle-group label span {
+        padding: 12px 25px;
+        border-radius: 30px;
+        border: 2px solid #007bff;
+        color: #007bff;
+        background-color: transparent;
+        transition: all 0.3s ease;
+      }
+      .toggle-group input[type="radio"]:checked + span {
+        background-color: #007bff;
+        color: white;
+      }
+      .npa-container {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        padding: 12px;
+        background-color: #eef3f9;
+        border-radius: 10px;
+      }
+      .npa-item {
+        background-color: #007bff;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 5px;
+        max-width: 450px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: hidden;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+      }
+      .npa-item:hover {
+        background-color: #005bb5;
+      }
+      .result-box {
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        justify-content: space-evenly;
+        flex-wrap: wrap;
+      }
+      .result-field {
+        width: 100%; /* Растягиваем поле результата на всю доступную ширину */
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #ced4da;
+        font-size: 16px;
+        white-space: normal; /* Разрешаем перенос строк */
+        overflow-wrap: break-word; /* Переносим длинные слова, не вмещающиеся в строку */
+      }
+      .result-field.highlight {
+        background-color: #d3ffbb; /* Цвет подсветки */
+        opacity: 1;
+      }
+
+      .result-field.fade {
+        background-color: transparent; /* Затухание обратно к исходному состоянию */
+        opacity: 1;
+      }
+      .copy-btn {
+        background-color: #28a745;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+      }
+      .copy-btn:hover {
+        background-color: #218838;
+      }
+      .copy-btn:active {
+        transform: scale(0.98);
+      }
+      .copy-btn.copied {
+        background-color: #17a2b8;
+      }
+      input[readonly] {
+        background-color: #e9ecef;
+        border: 1px solid #ced4da;
+        border-radius: 5px;
+        padding: 8px;
+        font-size: 16px;
+        width: 80%;
+      }
+      .hidden {
+        display: none;
+      }
+      #suggestions {
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px; /* Округленные углы */
+        max-height: 200px;
+        overflow-y: auto;
+        position: absolute;
+        width: 100%;
+        max-width: calc(100% - 0px);
+        box-sizing: border-box;
+        z-index: 1000;
+        left: 0;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Легкая тень */
+        transition: opacity 0.3s ease, transform 0.3s ease; /* Анимация */
+        opacity: 0;
+        transform: translateY(-10px);
+        pointer-events: none;
+      }
+
+      #suggestions.visible {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+      #suggestions.visible::-webkit-scrollbar {
+        width: 5px; /* Ширина полоски */
+      }
+
+      #suggestions.visible::-webkit-scrollbar-track {
+        background: #f1f1f1; /* Цвет трека полоски */
+        border-radius: 8px;
+      }
+
+      #suggestions.visible::-webkit-scrollbar-thumb {
+        background-color: #bdddff; /* Цвет самой полоски */
+        border-radius: 10px; /* Закругление полоски */
+      }
+
+      #suggestions.visible::-webkit-scrollbar-thumb:hover {
+        background: #2784ff; /* Цвет полоски при наведении */
+      }
+
+      .suggestion-item {
+        padding: 12px;
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 14px;
+        color: #333;
+        transition: background-color 0.2s ease, color 0.2s ease; /* Плавный переход цветов */
+      }
+
+      .suggestion-item:hover {
+        background-color: #e0e7ff; /* Легкий оттенок синего */
+        color: #2c3e50; /* Темный цвет текста */
+      }
+
+      .suggestion-item:active {
+        background-color: #d0d7ff; /* Более темный синий при клике */
+      }
+
+      .section {
+        position: relative;
+      }
+      .tooltip {
+        position: fixed; /* Ставим фиксированное позиционирование относительно окна браузера */
+        background-color: #333;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 14px;
+        display: none;
+        z-index: 1000;
+        white-space: nowrap;
+        opacity: 0;
+        transition: transform 0.5s ease, opacity 0.5s ease;
+
+        /* Центрирование по странице */
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+
+      .tooltip.show {
+        display: block;
+        opacity: 1;
+      }
+
+      .tooltip.hide {
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Кнопка выхода на основную страницу -->
+    <div class="invisible-hover-area">
+      <a href="../GPZU assistant.html" class="exit-button">Перейти на главную</a>
+    </div>
+
+    <div class="container">
+      <h1>Генератор текста ограничений</h1>
+
+      <div class="section">
+        <label for="search">Поисковая строка:</label>
+        <input type="text" id="search" placeholder="Введите название ограничения" oninput="filterNames()" onclick="filterNames()" autocomplete="off" />
+        <ul id="suggestions" class="hidden"></ul>
+      </div>
+
+      <div id="parameter-section" class="section hidden">
+        <h3>Выбор параметров:</h3>
+        <div class="toggle-group">
+          <label>
+            <input type="radio" name="location" value="Часть" checked />
+            <span>Часть</span>
+          </label>
+          <label>
+            <input type="radio" name="location" value="Целиком" />
+            <span>Целиком</span>
+          </label>
+        </div>
+      </div>
+
+      <div id="npa-section" class="section hidden">
+        <h3>Источник:</h3>
+        <div class="npa-container" id="npa-container"></div>
+      </div>
+
+      <div id="requisites-section" class="section hidden">
+        <label for="requisites">Реквизиты выписки:</label>
+        <input type="text" id="requisites" placeholder="Введите реквизиты выписки" />
+      </div>
+
+      <div id="result-section" class="section hidden">
+        <h3>Результат:</h3>
+        <div class="result-box">
+          <label><h2>Шапка:</h2></label>
+          <div id="header-result" class="result-field"></div>
+          <button class="copy-btn" onclick="copyToClipboard('header-result', this)">Копировать</button>
+        </div>
+        <div class="result-box">
+          <label><h2>Текст ограничения:</h2></label>
+          <div id="text-result" class="result-field"></div>
+          <button class="copy-btn" onclick="copyToClipboard('text-result', this)">Копировать</button>
+        </div>
+
+        <div class="result-box">
+          <label><h2>Текст условных обозначений на чертеже:</h2></label>
+          <div id="sign-result" class="result-field"></div>
+        </div>
+
+        <div class="result-box">
+          <label><h2>Ранее выданные и прочая инфомация:</h2></label>
+          <div id="other-result" class="result-field"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Инициализация переменных
+      let restrictions = JSON.parse(localStorage.getItem("restrictions")) || [];
+      let selectedRestriction = null; // Добавлено для хранения выбранного ограничения
+      let selectedNPA = null;
+      let header = "";
+
+      // Функция для заполнения НПА на основе выбранного ограничения
+      function populateNPA() {
+        const container = document.getElementById("npa-container");
+        container.innerHTML = ""; // Очистить контейнер перед заполнением
+
+        if (!selectedRestriction || !selectedRestriction.npa) {
+          console.log("Нет выбранного ограничения или НПА для него");
+          return;
+        }
+
+        const npaItems = selectedRestriction.npa;
+
+        npaItems.forEach((npa) => {
+          const npaDiv = document.createElement("div");
+          npaDiv.classList.add("npa-item");
+          npaDiv.textContent = npa.name.slice(0, 50);
+          npaDiv.addEventListener("click", () => handleNPASelection(npa));
+          container.appendChild(npaDiv);
+        });
+        updateResult();
+      }
+
+      // Функция обработки выбора НПА
+      function handleNPASelection(npa) {
+        selectedNPA = npa;
+        header = selectedRestriction.header;
+
+        document.getElementById("parameter-section").classList.remove("hidden");
+        document.getElementById("requisites-section").classList.remove("hidden");
+        document.getElementById("result-section").classList.remove("hidden");
+
+        updateResult(); // Обновить результат
+      }
+
+      document.getElementById("requisites-section").addEventListener("input", () => {
+        updateResult();
+      });
+
+      // Функция обновления результата
+      function updateResult() {
+        if (!selectedNPA || !header) return;
+
+        const locationRadio = document.querySelector('input[name="location"]:checked');
+        if (!locationRadio) {
+          // Если ни одна радио-кнопка не выбрана, можно задать значение по умолчанию или выйти
+          return;
+        }
+        const location = locationRadio.value;
+
+        if (selectedNPA.title.includes("выпиской из Единого государственного реестра недвижимости об объекте")) {
+          const requisites = document.getElementById("requisites").value;
+          localStorage.setItem("requisites", requisites);
+          var savedRequisites = localStorage.getItem("requisites");
+        } else {
+          const dataNun = "";
+          localStorage.setItem("requisites", dataNun);
+          document.getElementById("requisites-section").classList.add("hidden");
+          var savedRequisites = localStorage.getItem("requisites");
+        }
+
+        console.log("header", header);
+
+        const regex = /\[([^\]]+)\]/g;
+
+        let headerText =
+          location === "Часть"
+            ? `Часть земельного участка расположена в границах ${header} в соответствии с ${selectedNPA.title} ${savedRequisites}`
+            : `Земельный участок полностью расположен в границах ${header} в соответствии с ${selectedNPA.title} ${savedRequisites}`;
+
+        headerText = headerText.replace(regex, function (match, group) {
+          const elements = group.split("/").map((item) => item.trim());
+          const selectedElement = "Выберите элемент";
+
+          // Создаем элемент span с текстом и добавляем стиль
+          return `<span class="highlighted" style="background-color: #E91E63; color: white; font-size: 18px; font-weight: bold; border-radius: 10px; padding: 1px 3px; cursor: pointer;" data-elements="${elements.join("/")}">${selectedElement}</span>`;
+        });
+
+        document.getElementById("header-result").innerHTML = headerText;
+        document.getElementById("text-result").innerText = selectedNPA.text;
+        document.getElementById("sign-result").innerText = selectedRestriction.sign;
+        document.getElementById("other-result").innerText = selectedRestriction.other;
+
+        // Обработчик клика по выделенному фрагменту
+        document.querySelectorAll(".highlighted").forEach((element) => {
+          element.addEventListener("click", function () {
+            const elements = this.getAttribute("data-elements").split("/");
+            const popup = createPopup(elements, this);
+            document.body.appendChild(popup);
+          });
+        });
+      }
+
+      // Функция для создания popup окна
+      function createPopup(elements, targetElement) {
+        const popup = document.createElement("div");
+        popup.classList.add("popup");
+        popup.style.position = "fixed";
+        popup.style.backgroundColor = "#fff";
+        popup.style.border = "1px solid rgba(0, 0, 0, 0.1)";
+        popup.style.borderRadius = "8px"; // закругленные углы
+        popup.style.boxShadow = "0 4px 8px rgba(0, 0, 0, 0.1)"; // тень для глубины
+        popup.style.padding = "20px"; // более просторное внутреннее пространство
+        popup.style.zIndex = 1000;
+        popup.style.maxWidth = "600px"; // ограничение ширины
+        popup.style.fontFamily = "Arial, sans-serif"; // более современный шрифт
+        popup.style.fontSize = "14px"; // размер шрифта
+        popup.style.color = "#333"; // цвет текста
+
+        elements.forEach((element) => {
+          const button = document.createElement("button");
+          button.innerText = element;
+          button.style.padding = "12px 25px";
+          button.style.borderRadius = "8px";
+          //button.style.border = 'none';
+          button.style.backgroundColor = "#007bff";
+          button.style.color = "white";
+          button.style.fontSize = "16px";
+          button.style.fontWeight = "500";
+          button.style.margin = "8px";
+          button.style.cursor = "pointer";
+          button.style.transition = "background-color 0.3s ease, transform 0.2s ease";
+          button.style.boxShadow = "0 4px 8px rgba(0, 0, 0, 0.1)";
+
+          button.onmouseover = () => {
+            button.style.backgroundColor = "#005bb5";
+          };
+
+          button.onmouseout = () => {
+            button.style.backgroundColor = "#007bff";
+          };
+
+          button.onmousedown = () => {
+            button.style.transform = "scale(0.98)";
+          };
+
+          button.onmouseup = () => {
+            button.style.transform = "scale(1)";
+          };
+          button.addEventListener("click", function () {
+            targetElement.innerText = element; // Заменяем текст на выбранный элемент
+            document.body.removeChild(popup); // Удаляем popup
+          });
+
+          popup.appendChild(button);
+        });
+
+        // Размещение popup рядом с элементом
+        const rect = targetElement.getBoundingClientRect();
+        popup.style.top = `${rect.bottom + window.scrollY}px`;
+        popup.style.left = `${rect.left + window.scrollX}px`;
+
+        return popup;
+      }
+
+      // Функция фильтрации и отображения подсказок
+      function filterNames() {
+        const searchValue = document.getElementById("search").value.toLowerCase();
+        const suggestions = document.getElementById("suggestions");
+        suggestions.innerHTML = ""; // Очищаем список предложений
+
+        const filteredRestrictions = restrictions.filter((restriction) => restriction.name.toLowerCase().includes(searchValue));
+
+        if (filteredRestrictions.length === 0) {
+          suggestions.classList.add("hidden");
+          return;
+        }
+
+        suggestions.classList.add("visible");
+        suggestions.classList.remove("hidden");
+
+        filteredRestrictions.forEach((restriction) => {
+          const suggestionItem = document.createElement("li");
+          suggestionItem.textContent = restriction.name;
+          suggestionItem.classList.add("suggestion-item");
+          suggestionItem.addEventListener("click", () => {
+            document.getElementById("search").value = restriction.name;
+            suggestions.classList.add("hidden");
+            suggestions.classList.remove("visible");
+
+            if (selectedRestriction != restriction) {
+              document.getElementById("parameter-section").classList.add("hidden");
+              document.getElementById("requisites-section").classList.add("hidden");
+              document.getElementById("result-section").classList.add("hidden");
+            }
+
+            selectedRestriction = restriction; // Устанавливаем выбранное ограничение
+            header = selectedRestriction.header; // Добавляем заголовок
+            document.getElementById("npa-section").classList.remove("hidden"); // Показать секцию НПА
+            populateNPA(); // Заполняем НПА на основе выбранного ограничения
+            updateResult();
+          });
+          suggestions.appendChild(suggestionItem);
+        });
+      }
+
+      // Добавляем обработчик события focus для отображения всех вариантов при клике
+      document.getElementById("search").addEventListener("focus", () => {
+        const suggestions = document.getElementById("suggestions");
+        suggestions.classList.add("visible");
+        suggestions.classList.remove("hidden");
+
+        // Показ всех вариантов, если поле ввода пустое
+        if (document.getElementById("search").value === "") {
+          suggestions.innerHTML = ""; // Очищаем список
+          restrictions.forEach((restriction) => {
+            const suggestionItem = document.createElement("li");
+            suggestionItem.textContent = restriction.name;
+            suggestionItem.classList.add("suggestion-item");
+            suggestionItem.addEventListener("click", () => {
+              document.getElementById("search").value = restriction.name;
+              suggestions.classList.add("hidden");
+              suggestions.classList.remove("visible");
+
+              if (selectedRestriction != restriction) {
+                document.getElementById("parameter-section").classList.add("hidden");
+                document.getElementById("requisites-section").classList.add("hidden");
+                document.getElementById("result-section").classList.add("hidden");
+              }
+
+              selectedRestriction = restriction; // Устанавливаем выбранное ограничение
+              header = selectedRestriction.header; // Добавляем заголовок
+              document.getElementById("npa-section").classList.remove("hidden"); // Показать секцию НПА
+              populateNPA(); // Заполняем НПА на основе выбранного ограничения
+              updateResult();
+            });
+            suggestions.appendChild(suggestionItem);
+          });
+        }
+      });
+
+      // Функция копирования текста в буфер обмена с подсветкой элемента
+      function copyToClipboard(elementId, button) {
+        // Копирование текста с сохранением табуляции и переносов строк
+        var text = document.getElementById(elementId).innerText;
+        text = text.replace(/\n/g, "\r\n"); // Приведение переносов строк в правильный формат
+
+        navigator.clipboard.writeText(text).then(function () {
+          var element = document.getElementById(elementId);
+
+          // Добавляем класс highlight для подсветки
+          element.classList.add("highlight");
+
+          // Удаляем подсветку с затуханием
+          setTimeout(function () {
+            element.classList.remove("highlight");
+            element.classList.add("fade");
+          }, 1000); // Подсветка держится 1 секунду
+
+          // Полностью убираем класс fade через 1.5 секунды
+          setTimeout(function () {
+            element.classList.remove("fade");
+          }, 1500);
+        });
+      }
+
+      // Инициализация при загрузке страницы
+      window.onload = () => {
+        document.getElementById("parameter-section").classList.add("hidden");
+        document.getElementById("npa-section").classList.add("hidden");
+        document.getElementById("requisites-section").classList.add("hidden");
+        document.getElementById("result-section").classList.add("hidden");
+
+        dataNun = "";
+        localStorage.setItem("requisites", dataNun);
+
+        // Добавить обработчики событий для радио-кнопок местоположения
+        const locationRadios = document.querySelectorAll('input[name="location"]');
+        locationRadios.forEach((radio) => {
+          radio.addEventListener("change", updateResult);
+        });
+
+        // Если нужно установить первое ограничение как выбранное по умолчанию:
+        if (restrictions.length > 0) {
+          selectedRestriction = restrictions[0];
+          populateNPA();
+        }
+      };
+    </script>
+  </body>
+</html>

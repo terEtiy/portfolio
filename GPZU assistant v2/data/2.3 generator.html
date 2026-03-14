@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Форма ввода</title>
+    <style>
+      body {
+        font-family: 'Roboto', sans-serif;
+        background-color: #f4f4f9;
+        color: #333;
+        margin: 0;
+        padding: 20px;
+      }
+    
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #fff;
+        border-radius: 10px;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+      }
+    
+      .select-container {
+        width: 100%;
+        height: 90%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+    
+      .select-container label {
+        width: 90%;
+        height: 90%;
+        font-size: 18px;
+        font-weight: 500;
+      }
+    
+      .select-container select {
+        font-size: 16px;
+        padding: 10px;
+        border: 2px solid #0078d7;
+        border-radius: 5px;
+        background-color: #f4f4f9;
+        color: #333;
+        transition: border-color 0.3s ease;
+      }
+    
+      .select-container select:focus {
+        border-color: #005a9e;
+        outline: none;
+      }
+    
+      .table-container {
+        margin-bottom: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+    
+      .table {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 10px;
+      }
+    
+      .table div {
+        background-color: #e9efff;
+        padding: 15px;
+        border: 2px solid #0078d7;
+        border-radius: 5px;
+        text-align: center;
+        word-wrap: break-word;
+        min-height: 50px;
+      }
+    
+      .table-header div {
+        background-color: #0078d7;
+        color: white;
+        font-weight: bold;
+      }
+    
+      .add-button {
+        padding: 12px 20px;
+        background-color: #4caf50;
+        color: white;
+        font-size: 18px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+        align-self: flex-start;
+      }
+    
+      .add-button:hover {
+        background-color: #45a045;
+      }
+    
+      .result-container {
+        margin-top: 20px;
+        width: auto;
+        height: auto;
+      }
+    
+      .result-field {
+        width: 97%;
+        height: 90%;
+        border: 2px solid #ccc;
+        padding: 15px;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+        overflow-y: auto;
+      }
+      .styled-select {
+        width: 90%;
+        height: 90%;
+      }
+    </style>
+    
+    <body>
+      <div class="container">
+        <div class="select-container">
+          <label for="category">Выберите категорию:</label>
+          <select id="category">
+            <option value="УДС">УДС</option>
+            <option value="ЖД">ЖД</option>
+            <option value="ПК">ПК</option>
+            <option value="ТОЛ-ОТИ">Территория линейного объекта - объект транспортной инфраструктуры</option>
+            <option value="ТОЛ-ОИИ">Территория линейного объекта - объект инженерной инфраструктуры</option>
+            <option value="Территория береговой полосы">Территория береговой полосы</option>
+            <option value="Территория памятников и ансамблей">Территория памятников и ансамблей</option>
+          </select>
+        </div>
+    
+        <div class="table-container">
+          <div class="table table-header">
+            <div>Части</div>
+            <div>Подзоны</div>
+            <div>Площадь</div>
+          </div>
+          <div id="data-table" class="table">
+            <div contenteditable="true" class="editable-cell" oninput="handleInput(this, 0, 0)"></div>
+            <div contenteditable="true" class="editable-cell" oninput="handleInput(this, 0, 1)"></div>
+            <div contenteditable="true" class="editable-cell" oninput="handleInput(this, 0, 2)"></div>
+          </div>
+          <button class="add-button" onclick="addRow()">+</button>
+        </div>
+    
+        <div class="result-container">
+          <label for="text-result">Результат:</label>
+          <div id="text-result" class="result-field"></div>
+        </div>
+      </div>
+    
+      <script>
+        const dataMatrix = [['', '', '']]; // Многомерный массив для хранения строк
+        let selectedValue = 'УДС'
+
+        categorySelect = document.getElementById('category');
+
+        categorySelect.addEventListener('change', () => {
+          // Получаем выбранное значение
+          selectedValue = categorySelect.value;
+          if(selectedValue == 'УДС' || selectedValue == 'ЖД'){
+          const element = document.querySelector('.table.table-header > div:first-child');
+          element.textContent = 'Части'
+
+          }else if(selectedValue == 'ПК'){
+          const element = document.querySelector('.table.table-header > div:first-child');
+          element.textContent = 'Наименование ПК'
+          }
+          // Выводим значение в консоль
+          console.log(`Вы выбрали: ${selectedValue}`);
+          displayResult(selectedValue)
+  });
+
+        function addRow() {
+          const table = document.getElementById("data-table");
+          const rowIndex = dataMatrix.length;
+          const row = ['', '', ''];
+    
+          for (let i = 0; i < 3; i++) {
+            const newCell = document.createElement("div");
+            newCell.contentEditable = "true";
+            newCell.className = "editable-cell";
+            newCell.setAttribute("oninput", `handleInput(this, ${rowIndex}, ${i})`);
+            table.appendChild(newCell);
+          }
+    
+          dataMatrix.push(row); // Добавляем новую строку в массив
+        }
+    
+        function handleInput(cell, rowIndex, cellIndex) {
+          dataMatrix[rowIndex][cellIndex] = cell.textContent.trim(); // Обновляем массив
+          console.log('dataMatrix',dataMatrix)
+          displayResult(selectedValue); // Отображаем результат
+        }
+    
+        function displayResult(selectedValue) {
+
+          if(selectedValue == 'УДС'){
+
+          const resultField = document.getElementById("text-result");
+          resultField.innerHTML = "";
+
+          // Check if we have any meaningful data
+          if (dataMatrix.length === 0 || dataMatrix.every(row => !row[0] && !row[1] && !row[2])) {
+            resultField.textContent = "Для земельного участка, предназначенного для размещения улично-дорожной сети, использование определяется уполномоченными органами исполнительной власти субъектов Российской Федерации.";
+            return;
+          }
+
+          let resultText = "";
+          let partsText = "";
+          let validRows = dataMatrix.filter(row => row[0] && row[2]); // Filter rows with part number and area
+
+          // If we have valid rows, process them
+          if (validRows.length > 0) {
+            validRows.forEach((row, index) => {
+              const part = row[0];
+              const zones = row[1] ? row[1].split(',').map(zone => zone.trim()) : [];
+              const area = row[2];
+
+              if (index > 0) {
+                partsText += ", ";
+              }
+
+              partsText += `N${part}, площадью ${area} кв.м`;
+
+              if (zones.length > 0) {
+                if (zones.length === 1) {
+                    partsText += ` расположенной в границах подзоны №${zones[0]}`;
+                } else if (zones.length === 2) {
+                    partsText += ` расположенной в границах подзон №${zones[0]} и №${zones[1]}`;
+                } else {
+                    partsText += ` расположенной в границах подзон №${zones.slice(0, -1).join(', №')} и №${zones[zones.length - 1]}`;
+                }
+              }
+            });
+
+            // Determine if we're dealing with single or multiple parts
+            const prefix = validRows.length === 1 ? 
+              "Для части земельного участка " :
+              "Для частей земельного участка ";
+            
+            const suffix = validRows.length === 1 ?
+              ", предназначенной для размещения улично-дорожной сети, " :
+              ", предназначенных для размещения улично-дорожной сети, ";
+
+            resultText = prefix + partsText + suffix + 
+              "использование определяется уполномоченными органами исполнительной власти субъектов Российской Федерации.";
+          }
+
+  const resultElement = document.createElement("div");
+  resultElement.textContent = resultText || "Для земельного участка, предназначенного для размещения улично-дорожной сети, использование определяется уполномоченными органами исполнительной власти субъектов Российской Федерации.";
+  resultField.appendChild(resultElement);
+        } else if (selectedValue == 'ЖД') {
+
+          const element = document.querySelector('.table.table-header > div:first-child');
+          element.textContent = 'Части'
+
+          const resultField = document.getElementById("text-result");
+          resultField.innerHTML = "";
+
+          // Check if we have any meaningful data
+          if (dataMatrix.length === 0 || dataMatrix.every(row => !row[0] && !row[1] && !row[2])) {
+            resultField.textContent = "Для земельного участка, предназначенного для размещения железнодорожной линии, использование определяется уполномоченными органами исполнительной власти субъектов Российской Федерации.";
+            return;
+          }
+
+          let resultText = "";
+          let partsText = "";
+          let validRows = dataMatrix.filter(row => row[0] && row[2]); // Filter rows with part number and area
+
+          // If we have valid rows, process them
+          if (validRows.length > 0) {
+            validRows.forEach((row, index) => {
+              const part = row[0];
+              const zones = row[1] ? row[1].split(',').map(zone => zone.trim()) : [];
+              const area = row[2];
+
+              if (index > 0) {
+                partsText += ", ";
+              }
+
+              partsText += `N${part}, площадью ${area} кв.м`;
+
+              if (zones.length > 0) {
+                if (zones.length === 1) {
+                    partsText += ` расположенной в границах подзоны №${zones[0]}`;
+                } else if (zones.length === 2) {
+                    partsText += ` расположенной в границах подзон №${zones[0]} и №${zones[1]}`;
+                } else {
+                    partsText += ` расположенной в границах подзон №${zones.slice(0, -1).join(', №')} и №${zones[zones.length - 1]}`;
+                }
+              }
+            });
+
+            // Determine if we're dealing with single or multiple parts
+            const prefix = validRows.length === 1 ? 
+              "Для части земельного участка " :
+              "Для частей земельного участка ";
+            
+            const suffix = validRows.length === 1 ?
+              ", предназначенного для размещения железнодорожной линии, " :
+              ", предназначенных для размещения железнодорожной линии, ";
+
+            resultText = prefix + partsText + suffix + 
+              "использование определяется уполномоченными органами исполнительной власти субъектов Российской Федерации.";
+          }
+
+  const resultElement = document.createElement("div");
+  resultElement.textContent = resultText || "Для земельного участка, предназначенного для размещения железнодорожной линии, использование определяется уполномоченными органами исполнительной власти субъектов Российской Федерации.";
+  resultField.appendChild(resultElement);
+
+        } 
+
+        else if (selectedValue == 'ПК') {
+
+
+        }
+        
+        else{
+          const resultField = document.getElementById("text-result");
+          resultField.innerHTML = "";
+          
+  const resultElement = document.createElement("div");
+  resultElement.textContent = 'В разработке ^^'
+  resultField.appendChild(resultElement);
+
+        }
+}
+
+
+      </script>
+    </body>
+    
+</html>

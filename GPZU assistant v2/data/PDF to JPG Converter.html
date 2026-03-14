@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to JPG Converter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+  .invisible-hover-area {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 300px; /* Увеличенный размер по ширине */
+    height: 300px; /* Увеличенный размер по высоте */
+    z-index: 999; /* Обеспечиваем, что этот div будет перед другими элементами */
+  }
+
+  .invisible-hover-area:hover .exit-button {
+    transform: translateX(310px) scale(1.05);
+    background-color: #0056b3;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  }
+
+  .exit-button {
+    display: inline-block;
+    padding: 12px 24px;
+    background-color: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 25px;
+    font-size: 16px;
+    font-weight: bold;
+    position: fixed;
+    top: 20px;
+    left: -300px;
+    z-index: 1000;
+    transition: transform 0.8s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+    transform: translateX(110px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  }
+
+  .exit-button:active {
+    transform: translateX(310px) scale(0.95);
+    background-color: #00408f;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  }
+        h1 {
+            color: #333;
+        }
+        form {
+            background: #fff;
+            padding: 20px;
+            border-radius: 25px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        input[type="file"] {
+            padding: 10px;
+            border-radius: 25px;
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            border-radius: 25px;
+            border: none;
+            background-color: #007bff;
+            color: #fff;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #progress {
+            width: 100%;
+            max-width: 600px;
+            background: #e0e0e0;
+            border-radius: 25px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+        #progressText {
+            padding: 10px;
+            text-align: center;
+            font-size: 16px;
+            color: #333;
+        }
+        #progressBar {
+            height: 20px;
+            background: #007bff;
+            width: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Кнопка выхода на основную страницу -->
+<div class="invisible-hover-area">
+  <a href="../GPZU assistant.html" class="exit-button">Перейти на главную</a>
+</div>
+
+    <h1>PDF to JPG Converter</h1>
+    <form id="uploadForm">
+        <input type="file" id="pdfFiles" name="pdfs" multiple accept="application/pdf">
+        <button type="submit">Convert to JPG and ZIP</button>
+    </form>
+    <div id="progress">
+        <div id="progressBar"></div>
+        <p id="progressText">Waiting for file upload...</p>
+    </div>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        document.getElementById('uploadForm').onsubmit = async (event) => {
+            event.preventDefault();
+            
+            const files = document.getElementById('pdfFiles').files;
+            if (files.length === 0) {
+                alert('Please select PDF files.');
+                return;
+            }
+
+            const zip = new JSZip();
+            const progressText = document.getElementById('progressText');
+            const progressBar = document.getElementById('progressBar');
+            let totalPages = 0;
+            let processedPages = 0;
+
+            for (const file of files) {
+                const fileReader = new FileReader();
+                
+                fileReader.onload = async function() {
+                    const pdfData = new Uint8Array(fileReader.result);
+                    const pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
+                    const numPages = pdfDoc.numPages;
+                    totalPages += numPages;
+
+                    for (let i = 1; i <= numPages; i++) {
+                        const page = await pdfDoc.getPage(i);
+                        const viewport = page.getViewport({ scale: 1.5 });
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+
+                        await page.render({ canvasContext: context, viewport: viewport }).promise;
+			// Use closure to preserve the correct context for blob creation
+                        (function(fileName, pageNum) {
+                            canvas.toBlob((blob) => {
+                                zip.file(`${fileName.replace('.pdf', '')}_page${pageNum}.jpg`, blob);
+
+                                processedPages++;
+                                const progressPercentage = (processedPages / totalPages) * 100;
+                                progressBar.style.width = progressPercentage + '%';
+                                progressText.innerText = `Processing ${processedPages} of ${totalPages} pages...`;
+
+                                if (processedPages === totalPages) {
+                                    zip.generateAsync({ type: 'blob' }).then((content) => {
+                                        const url = URL.createObjectURL(content);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = 'pdf_images.zip';
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        document.body.removeChild(a);
+                                        progressText.innerText = 'Conversion completed!';
+                                    });
+                                }
+                            }, 'image/jpeg');
+                        })(file.name, i);
+                    }
+                };
+
+                fileReader.readAsArrayBuffer(file);
+            }
+        };
+    </script>
+</body>
+</html>

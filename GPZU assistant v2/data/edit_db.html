@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Редактирование БД</title>
+    <style>
+      body {
+        font-family: "Roboto", sans-serif;
+        margin: 0;
+        padding: 0;
+        background: -webkit-linear-gradient(45deg, rgb(164, 154, 207), rgb(97, 227, 221) 26%, rgb(241, 208, 242) 84%);
+        background: -moz-linear-gradient(45deg, rgb(164, 154, 207), rgb(97, 227, 221) 26%, rgb(241, 208, 242) 84%);
+        background: linear-gradient(45deg, rgb(164, 154, 207), rgb(97, 227, 221) 26%, rgb(241, 208, 242) 84%);
+      }
+      .invisible-hover-area {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 300px; /* Увеличенный размер по ширине */
+        height: 300px; /* Увеличенный размер по высоте */
+        z-index: 999; /* Обеспечиваем, что этот div будет перед другими элементами */
+      }
+
+      .invisible-hover-area:hover .exit-button {
+        transform: translateX(310px) scale(1.05);
+        background-color: #0056b3;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      }
+
+      .exit-button {
+        display: inline-block;
+        padding: 12px 24px;
+        background-color: #007bff;
+        color: white;
+        text-decoration: none;
+        border-radius: 25px;
+        font-size: 16px;
+        font-weight: bold;
+        position: fixed;
+        top: 20px;
+        left: -300px;
+        z-index: 1000;
+        transition: transform 0.4s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+        transform: translateX(110px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      }
+
+      .exit-button:active {
+        transform: translateX(310px) scale(0.95);
+        background-color: #00408f;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      }
+      .container {
+        width: 90%;
+        margin: 40px auto;
+        text-align: center;
+      }
+
+      h1 {
+        font-size: 2.5em;
+        color: #333;
+      }
+
+      .button {
+        background-color: #007bff;
+        color: white;
+        padding: 12px 24px;
+        margin: 10px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+        font-size: 1em;
+      }
+
+      .button:hover {
+        background-color: #0056b3;
+      }
+
+      .popup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        display: none;
+        width: 80%;
+        max-height: 80%;
+        overflow-y: auto;
+        z-index: 1001;
+      }
+      /* Стилизация полосы прокрутки */
+      .popup::-webkit-scrollbar {
+        width: 10px; /* Ширина полоски */
+      }
+
+      .popup::-webkit-scrollbar-track {
+        background: #f1f1f1; /* Цвет трека полоски */
+        border-radius: 8px;
+      }
+
+      .popup::-webkit-scrollbar-thumb {
+        background-color: #bdddff; /* Цвет самой полоски */
+        border-radius: 10px; /* Закругление полоски */
+      }
+
+      .popup::-webkit-scrollbar-thumb:hover {
+        background: #2784ff; /* Цвет полоски при наведении */
+      }
+
+      .popup h3 {
+        margin-bottom: 15px;
+        font-size: 1.5em;
+      }
+
+      .close-popup {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        background-color: transparent;
+        color: #333;
+        border: none;
+        font-size: 1.5em;
+        cursor: pointer;
+      }
+
+      .close-popup:hover {
+        color: #007bff;
+      }
+
+      .npaPopup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        display: none;
+        width: 80%;
+        max-height: 80%;
+        overflow-y: auto;
+        z-index: 1002;
+      }
+      /* Стилизация полосы прокрутки */
+      .npaPopup::-webkit-scrollbar {
+        width: 10px; /* Ширина полоски */
+      }
+
+      .npaPopup::-webkit-scrollbar-track {
+        background: #f1f1f1; /* Цвет трека полоски */
+        border-radius: 8px;
+      }
+
+      .npaPopup::-webkit-scrollbar-thumb {
+        background-color: #bdddff; /* Цвет самой полоски */
+        border-radius: 10px; /* Закругление полоски */
+      }
+
+      .npaPopup::-webkit-scrollbar-thumb:hover {
+        background: #2784ff; /* Цвет полоски при наведении */
+      }
+
+      .npaPopup h3 {
+        margin-bottom: 15px;
+        font-size: 1.5em;
+      }
+
+      .close-npaPopup {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        background-color: transparent;
+        color: #333;
+        border: none;
+        font-size: 1.5em;
+        cursor: pointer;
+      }
+
+      .close-npaPopup:hover {
+        color: #007bff;
+      }
+
+      .restriction-list {
+        margin-top: 30px;
+        display: flex;
+        justify-content: space-between; /* Распределение элементов */
+        flex-wrap: wrap; /* Перенос элементов на новую строку */
+        align-items: center;
+        justify-content: center;
+      }
+
+      .restriction-item {
+        max-width: 269px;
+        min-height: 239px;
+        display: flex;
+        justify-content: space-between;
+        padding: 15px;
+        border: 1px solid #ddd;
+        margin-bottom: 15px;
+        background-color: #fff;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        flex-direction: column;
+        margin: 2px;
+      }
+
+      .json-output {
+        text-align: left;
+        background-color: #fff;
+        padding: 20px;
+        border: 1px solid #ddd;
+        margin-top: 20px;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .editable-div {
+        border: 1px solid #ddd;
+        padding: 15px;
+        min-height: 15px;
+        margin: 15px 0;
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        overflow-wrap: break-word;
+        resize: vertical;
+        text-align: left;
+      }
+
+      .overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.6);
+        z-index: 1000;
+        display: none;
+      }
+
+      .overlay1 {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.6);
+        z-index: 1002;
+        display: none;
+      }
+      .npa-item {
+        background-color: #fff;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 15px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        text-align: left;
+      }
+
+      .npa-item strong {
+        font-size: 1.1em;
+        color: #333;
+      }
+
+      .npa-item button {
+        margin-top: 10px;
+        background-color: #28a745;
+        color: white;
+        padding: 8px 16px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 0.9em;
+      }
+
+      .npa-item button:hover {
+        background-color: #218838;
+      }
+      .editButton {
+        margin-right: 40px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- Кнопка выхода на основную страницу -->
+    <div class="invisible-hover-area">
+      <a href="../GPZU assistant.html" class="exit-button">Перейти на главную</a>
+    </div>
+
+    <div class="container">
+      <h1>Редактирование БД</h1>
+      <button class="button" id="createRestriction">Создать новое ограничение</button>
+      <button class="button" id="saveJson">Сохранить БД в файл json</button>
+      <button class="button" id="loadJson">Загрузить БД из json</button>
+
+      <div class="restriction-list" id="restrictionList"></div>
+      <div class="overlay1" id="overlay1"></div>
+
+      <div class="popup" id="restrictionPopup">
+        <button class="close-popup" id="closeRestrictionPopup">×</button>
+        <h3>Имя ограничения</h3>
+        <div contenteditable="true" id="restrictionName" class="editable-div"></div>
+
+        <h3>Шапка ограничения</h3>
+        <div contenteditable="true" id="restrictionHeader" class="editable-div"></div>
+
+        <h3>Условные знаки на чертеже</h3>
+        <div contenteditable="true" id="restrictionConventionalSign" class="editable-div"></div>
+
+        <h3>Ранее выданные и прочая инфомация</h3>
+        <div contenteditable="true" id="restrictionOtherInformation" class="editable-div"></div>
+
+        <div id="npaContainer"></div>
+
+        <button class="button" id="addNPA">Добавить новое НПА</button>
+
+        <h3>JSON Код Ограничения:</h3>
+        <div class="json-output" id="jsonOutput"></div>
+
+        <button class="button" id="saveRestriction">Сохранить</button>
+      </div>
+
+      <div class="npaPopup" id="npaPopup">
+        <button class="close-popup" id="closeNPAPopup">×</button>
+        <h3>Название НПА</h3>
+        <div contenteditable="true" id="npaName" class="editable-div"></div>
+        <h3>Нормативно правовой акт (в шапку)</h3>
+        <div contenteditable="true" id="npaTitle" class="editable-div"></div>
+        <h3>Текст ограничения</h3>
+        <div contenteditable="true" id="npaText" class="editable-div"></div>
+
+        <button class="button" id="saveNPA">Сохранить НПА</button>
+      </div>
+
+      <div class="overlay" id="overlay"></div>
+    </div>
+
+    <script>
+      const createRestrictionButton = document.getElementById("createRestriction");
+      const saveJsonButton = document.getElementById("saveJson");
+      const loadJsonButton = document.getElementById("loadJson");
+      const restrictionPopup = document.getElementById("restrictionPopup");
+      const closeRestrictionPopup = document.getElementById("closeRestrictionPopup");
+      const saveRestrictionButton = document.getElementById("saveRestriction");
+      const addNPAButton = document.getElementById("addNPA");
+      const npaPopup = document.getElementById("npaPopup");
+      const closeNPAPopup = document.getElementById("closeNPAPopup");
+      const saveNPAButton = document.getElementById("saveNPA");
+      const restrictionList = document.getElementById("restrictionList");
+      const jsonOutput = document.getElementById("jsonOutput");
+      const overlay = document.getElementById("overlay");
+      const overlay1 = document.getElementById("overlay1");
+
+      let restrictions = JSON.parse(localStorage.getItem("restrictions")) || [];
+      let currentRestrictionIndex = null;
+      let currentNPAIndex = null;
+      let isEditing = false;
+
+      renderRestrictionList();
+
+      function saveToLocalStorage() {
+        console.log("saveToLocalStorage", restrictions);
+        localStorage.setItem("restrictions", JSON.stringify(restrictions));
+      }
+
+      saveJsonButton.addEventListener("click", () => {
+        const jsonStr = JSON.stringify(restrictions, null, 4);
+        const blob = new Blob([jsonStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "restrictions.json";
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+
+      loadJsonButton.addEventListener("click", () => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "application/json";
+        input.addEventListener("change", (event) => {
+          const file = event.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              try {
+                const loadedRestrictions = JSON.parse(e.target.result);
+                restrictions = Array.isArray(loadedRestrictions) ? loadedRestrictions : [];
+                saveToLocalStorage();
+                renderRestrictionList();
+              } catch (error) {
+                alert("Ошибка при загрузке файла: неверный формат JSON");
+              }
+            };
+            reader.readAsText(file);
+          }
+        });
+        input.click();
+      });
+
+      document.getElementById("createRestriction").addEventListener("click", () => {
+        clearRestrictionForm();
+        currentRestrictionIndex = null;
+        isEditing = false;
+        restrictionPopup.style.display = "block";
+        overlay.style.display = "block";
+      });
+
+      closeRestrictionPopup.addEventListener("click", () => {
+        restrictionPopup.style.display = "none";
+        overlay.style.display = "none";
+      });
+
+      addNPAButton.addEventListener("click", () => {
+        clearNPAForm();
+        npaPopup.style.display = "block";
+        overlay1.style.display = "block";
+      });
+
+      closeNPAPopup.addEventListener("click", () => {
+        npaPopup.style.display = "none";
+        overlay1.style.display = "none";
+      });
+
+      saveNPAButton.addEventListener("click", () => {
+        const npaTitle = document.getElementById("npaTitle").innerText.trim();
+        const npaText = document.getElementById("npaText").innerText.trim();
+        const npaName = document.getElementById("npaName").innerText.trim();
+
+        const newNPA = {
+          title: npaTitle,
+          text: npaText,
+          name: npaName,
+        };
+
+        if (typeof currentNPAIndex === "string") {
+          console.log(1);
+          currentRestriction.npa[currentNPAIndex] = newNPA;
+          currentNPAIndex = null;
+        } else {
+          console.log(2, typeof currentNPAIndex);
+          currentRestriction.npa.push(newNPA);
+        }
+
+        renderNPAList();
+        updateJsonOutput();
+        npaPopup.style.display = "none";
+        overlay1.style.display = "none";
+      });
+
+      saveRestrictionButton.addEventListener("click", () => {
+        const date = new Date().toLocaleDateString();
+        currentRestriction.name = document.getElementById("restrictionName").innerText.trim();
+        currentRestriction.header = document.getElementById("restrictionHeader").innerText.trim();
+        currentRestriction.sign = document.getElementById("restrictionConventionalSign").innerText.trim();
+        currentRestriction.other = document.getElementById("restrictionOtherInformation").innerText.trim();
+        currentRestriction.date = date;
+
+        if (isEditing && currentRestrictionIndex !== null) {
+          restrictions[currentRestrictionIndex] = currentRestriction;
+        } else {
+          restrictions.push(currentRestriction);
+        }
+
+        console.log("currentRestrictionIndex", currentRestrictionIndex);
+
+        isEditing = false;
+        currentRestrictionIndex = null;
+        currentRestriction = { name: "", header: "", sign: "", other: "", date: date, npa: [] };
+        console.log("Save date", date, currentRestriction);
+
+        renderRestrictionList();
+        saveToLocalStorage();
+        restrictionPopup.style.display = "none";
+        overlay.style.display = "none";
+      });
+
+      restrictionList.addEventListener("click", (event) => {
+        const index = event.target.getAttribute("data-index");
+
+        if (event.target.classList.contains("editButton")) {
+          currentRestriction = { ...restrictions[index] };
+          currentRestrictionIndex = index;
+          isEditing = true;
+          fillRestrictionForm(currentRestriction);
+          renderNPAList();
+          updateJsonOutput();
+          restrictionPopup.style.display = "block";
+          overlay.style.display = "block";
+        }
+
+        if (event.target.classList.contains("deleteButton")) {
+          restrictions.splice(index, 1);
+          renderRestrictionList();
+          saveToLocalStorage();
+        }
+      });
+
+      document.getElementById("npaContainer").addEventListener("click", (event) => {
+        if (event.target.classList.contains("deleteNpaButton")) {
+          const npaIndex = event.target.getAttribute("data-index");
+          currentRestriction.npa.splice(npaIndex, 1);
+          renderNPAList();
+          updateJsonOutput();
+        }
+
+        if (event.target.classList.contains("editNpaButton")) {
+          const npaIndex = event.target.getAttribute("data-index");
+          currentNPAIndex = npaIndex;
+          fillNPAForm(currentRestriction.npa[npaIndex]);
+          npaPopup.style.display = "block";
+          overlay1.style.display = "block";
+        }
+      });
+
+      function renderRestrictionList() {
+        restrictionList.innerHTML = "";
+        restrictions.forEach((restriction, index) => {
+          const restrictionElement = document.createElement("div");
+          restrictionElement.classList.add("restriction-item");
+          restrictionElement.innerHTML = `
+    <div>
+        <strong>Имя ограничения:</strong> <br> ${restriction.name}<br>
+        <strong>Дата обновления:</strong> ${restriction.date}
+    </div>
+    <div>
+        <img class="editButton" src="edit.png" alt="Редактировать" data-index="${index}" width="40" height="40" margin-top = "10" style="cursor: pointer;">
+        <img class="deleteButton" src="delete.png" alt="Удалить" data-index="${index}" width="40" height="40" margin-top = "10" style="cursor: pointer;">
+    </div>
+`;
+          restrictionList.appendChild(restrictionElement);
+        });
+      }
+
+      function renderNPAList() {
+        const npaContainer = document.getElementById("npaContainer");
+        npaContainer.innerHTML = "";
+        currentRestriction.npa.forEach((npa, index) => {
+          const npaDiv = document.createElement("div");
+          npaDiv.classList.add("npa-item");
+          npaDiv.innerHTML = `
+                    <strong>Название:</strong> ${npa.name}<br>
+                    <strong>НПА (в шапку):</strong> ${npa.title}<br>
+                    <strong>Текст ограничения:</strong> ${npa.text}<br>
+                                        
+                    <button class="button editNpaButton" data-index="${index}">Редактировать</button>
+                    <button class="button deleteNpaButton" data-index="${index}">Удалить</button>
+                `;
+          npaContainer.appendChild(npaDiv);
+        });
+      }
+
+      function updateJsonOutput() {
+        jsonOutput.innerText = JSON.stringify(currentRestriction, null, 5);
+        saveToLocalStorage();
+      }
+
+      function clearRestrictionForm() {
+        date = new Date().toLocaleDateString();
+        document.getElementById("restrictionName").innerText = "";
+        document.getElementById("restrictionHeader").innerText = "";
+        document.getElementById("restrictionConventionalSign").innerText = "";
+        document.getElementById("restrictionOtherInformation").innerText = "";
+        document.getElementById("npaContainer").innerHTML = "";
+        currentRestriction = { name: "", header: "", sign: "", date: date, npa: [] };
+      }
+
+      function fillRestrictionForm(restriction) {
+        console.log("geting restriction", restriction);
+        document.getElementById("restrictionName").innerText = restriction.name;
+        document.getElementById("restrictionHeader").innerText = restriction.header;
+        document.getElementById("restrictionConventionalSign").innerText = restriction.sign;
+        document.getElementById("restrictionOtherInformation").innerText = restriction.other;
+      }
+
+      function clearNPAForm() {
+        document.getElementById("npaTitle").innerText = "";
+        document.getElementById("npaText").innerText = "";
+        document.getElementById("npaName").innerText = "";
+      }
+
+      function fillNPAForm(npa) {
+        document.getElementById("npaTitle").innerText = npa.title;
+        document.getElementById("npaText").innerText = npa.text;
+        document.getElementById("npaName").innerText = npa.name;
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Comparator with Konva.js</title>
+
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: "Arial", sans-serif;
+        background-color: #e0e0e0;
+        color: #333;
+        overflow: hidden;
+      }
+
+      #stage-container {
+        width: 100vw;
+        height: 100vh;
+        background-color: #ffffff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      #controls {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: #ffffff;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        z-index: 10;
+        max-width: 850px;
+        width: 100%;
+        transition: all 0.3s ease;
+      }
+
+      #fileInputWrapper {
+        border: 2px dashed #007bff;
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: border-color 0.3s ease;
+        background-color: #f9f9f9;
+      }
+
+      #fileInputWrapper:hover {
+        border-color: #0056b3;
+      }
+
+      #fileInputWrapper.dragover {
+        background-color: #e0e0e0;
+        border-color: #0056b3;
+      }
+
+      #fileInput {
+        display: none;
+      }
+
+      #layerControls {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #ccc;
+        padding: 10px;
+        border-radius: 8px;
+        background-color: #f9f9f9;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+      }
+
+      .layer-control {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 10px 0;
+        padding: 8px;
+        background-color: #fff;
+        border-radius: 6px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        transition: background-color 0.3s ease;
+      }
+
+      .layer-control:hover {
+        background-color: #f1f1f1;
+      }
+
+      .numeric-input {
+        width: 60px;
+        padding: 5px;
+        font-size: 14px;
+        text-align: right;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+
+      button {
+        padding: 8px 12px;
+        font-size: 14px;
+        color: white;
+        background-color: #007bff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+      }
+
+      button:hover {
+        background-color: #0056b3;
+      }
+
+      /* Responsive layout */
+      @media (max-width: 600px) {
+        #controls {
+          top: auto;
+          bottom: 10px;
+          right: 10px;
+          left: auto;
+          transform: translateX(0);
+          width: calc(100% - 20px);
+        }
+
+        #layerControls {
+          max-height: 150px;
+        }
+      }
+
+      @media (max-height: 500px) {
+        #controls {
+          position: relative;
+          bottom: auto;
+          right: auto;
+          transform: none;
+          width: 100%;
+          margin: 0;
+        }
+
+        #layerControls {
+          max-height: 150px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="controls">
+      <div id="fileInputWrapper">
+        Перетащите файлы сюда или нажмите для загрузки
+        <input type="file" id="fileInput" multiple />
+      </div>
+      <div id="layerControls"></div>
+    </div>
+    <div id="stage-container"></div>
+    <!-- Script Dependencies -->
+    <script src="popper.min.js"></script>
+    <script src="konva.min.js"></script>
+    <script src="tippy-bundle.iife.min.js"></script>
+    <script src="localforage.min.js"></script>
+
+    <script>
+      const fileInputWrapper = document.getElementById("fileInputWrapper");
+      const fileInput = document.getElementById("fileInput");
+
+      // Клик для открытия диалога выбора файлов
+      fileInputWrapper.addEventListener("click", () => {
+        fileInput.click();
+      });
+
+      // Добавляем события drag & drop
+      fileInputWrapper.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        fileInputWrapper.classList.add("dragover");
+      });
+
+      fileInputWrapper.addEventListener("dragleave", () => {
+        fileInputWrapper.classList.remove("dragover");
+      });
+
+      fileInputWrapper.addEventListener("drop", (event) => {
+        event.preventDefault();
+        fileInputWrapper.classList.remove("dragover");
+        const files = event.dataTransfer.files;
+        handleFiles(files);
+      });
+
+      fileInput.addEventListener("change", (event) => {
+        const files = event.target.files;
+        handleFiles(files);
+      });
+
+      function handleFiles(files) {
+        console.log("Загруженные файлы:", files);
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        let selectedImage = null; // Variable to store the selected image
+        let isPanning = false;
+
+        const stageContainer = document.getElementById("stage-container");
+        const layerControls = document.getElementById("layerControls");
+        const fileInput = document.getElementById("fileInput");
+        const stage = new Konva.Stage({
+          container: "stage-container",
+          width: stageContainer.offsetWidth,
+          height: stageContainer.offsetHeight,
+          draggable: true, // Добавляем возможность перетаскивания самой сцены
+        });
+        const layer = new Konva.Layer();
+        stage.add(layer);
+
+        /*
+        // Инициализация трансформера
+        const transformer = new Konva.Transformer({
+          rotateEnabled: true,
+          enabledAnchors: ["top-left", "top-right", "bottom-left", "bottom-right", "rotater"],
+          boundBoxFunc: (oldBox, newBox) => {
+            newBox.width = Math.max(30, newBox.width);
+            newBox.height = Math.max(30, newBox.height);
+            return newBox;
+          },
+        });
+        layer.add(transformer);
+        transformer.hide();
+
+        // Обработка изменений через трансформер
+        transformer.on("transform", () => {
+          if (selectedImage) {
+            const controls = selectedImage.userData.controls;
+            if (controls) {
+              controls.rotationInput.value = Math.round(selectedImage.rotation());
+              controls.rotationNumeric.value = Math.round(selectedImage.rotation());
+              controls.scaleInput.value = selectedImage.scaleX().toFixed(2);
+              controls.scaleNumeric.value = selectedImage.scaleX().toFixed(2);
+            }
+            saveImages();
+          }
+        });
+*/
+        /*
+              stageContainer.addEventListener("mousedown", (e) => {
+                isPanning = true;
+                startX = e.clientX - offsetX;
+                startY = e.clientY - offsetY;
+              });
+              */
+
+        stageContainer.addEventListener("mouseup", () => {
+          isPanning = false;
+        });
+
+        // Также останавливаем перемещение, если курсор выходит за пределы окна
+        stageContainer.addEventListener("mouseleave", () => {
+          isPanning = false;
+        });
+
+        // Load saved images
+        localforage.getItem("images").then((savedImages) => {
+          if (savedImages) {
+            savedImages.forEach((imageData) => {
+              addImageToStage(imageData);
+            });
+          }
+        });
+
+        /*
+              // Перемещение страницы при движении мыши
+              stageContainer.addEventListener("mousemove", (e) => {
+                if (!isPanning) return;
+                offsetX = e.clientX - startX;
+                offsetY = e.clientY - startY;
+                stage.x(offsetX);
+                stage.y(offsetY);
+                stage.draw();
+              });
+      */
+        // Event handler for file input
+        fileInput.addEventListener("change", (event) => {
+          const files = event.target.files;
+          for (const file of files) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const src = e.target.result;
+              const imgObj = new Image();
+              imgObj.src = src;
+
+              imgObj.onload = () => {
+                const konvaImage = new Konva.Image({
+                  x: 0,
+                  y: 0,
+                  image: imgObj,
+                  draggable: true,
+                });
+                layer.add(konvaImage);
+                layer.draw();
+              };
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+
+        // Paste images from clipboard
+        document.addEventListener("paste", (event) => {
+          const items = event.clipboardData.items;
+          for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf("image") !== -1) {
+              const blob = items[i].getAsFile();
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                const src = e.target.result;
+                const imageData = { src, x: 0, y: 0, scale: 1, opacity: 1 };
+                addImageToStage(imageData);
+                saveImages();
+              };
+              reader.readAsDataURL(blob);
+            }
+          }
+        });
+
+        // Function to add image to Konva stage
+        function addImageToStage({ src, x = 0, y = 0, scale = 1, opacity = 1, rotation = 0 }) {
+          const imgObj = new Image();
+          imgObj.src = src;
+
+          imgObj.onload = () => {
+            const konvaImage = new Konva.Image({
+              x,
+              y,
+              image: imgObj,
+              draggable: true,
+              scaleX: scale,
+              scaleY: scale,
+              opacity,
+              rotation: rotation,
+            });
+
+            konvaImage.on("click", () => {
+              selectedImage = konvaImage;
+              transformer.nodes([konvaImage]);
+              transformer.show();
+              layer.draw();
+            });
+
+            // Add image controls and pass them to the wheel event handler
+            const { scaleInput, scaleNumeric } = addImageControls(konvaImage);
+            layer.add(konvaImage);
+            layer.draw();
+
+            // Handle wheel event for scaling
+            konvaImage.on("wheel", (e) => {
+              if (e.evt.shiftKey) {
+                e.evt.preventDefault();
+                const newScale = konvaImage.scaleX() + (e.evt.deltaY > 0 ? -0.05 : 0.05);
+                konvaImage.scale({ x: newScale, y: newScale });
+                scaleInput.value = newScale.toFixed(2); // Update range input
+                scaleNumeric.value = newScale.toFixed(2); // Update numeric input
+                layer.draw();
+                saveImages();
+              }
+            });
+
+            layer.add(konvaImage);
+            layer.draw();
+          };
+        }
+
+        // Keydown event listener for moving the image with arrow keys
+        document.addEventListener("keydown", (event) => {
+          if (selectedImage) {
+            const moveAmount = 2; // Pixels to move per key press
+            switch (event.key) {
+              case "ArrowUp":
+                selectedImage.y(selectedImage.y() - moveAmount);
+                break;
+              case "ArrowDown":
+                selectedImage.y(selectedImage.y() + moveAmount);
+                break;
+              case "ArrowLeft":
+                selectedImage.x(selectedImage.x() - moveAmount);
+                break;
+              case "ArrowRight":
+                selectedImage.x(selectedImage.x() + moveAmount);
+                break;
+            }
+            layer.draw(); // Redraw the layer after moving the image
+            saveImages(); // Save the new position
+          }
+        });
+
+        // Function to add controls for each image
+        function addImageControls(konvaImage) {
+          const controlContainer = document.createElement("div");
+          controlContainer.classList.add("layer-control");
+
+          const scaleLabel = document.createElement("label");
+          scaleLabel.innerText = "Scale:";
+          const scaleInput = document.createElement("input");
+          scaleInput.type = "range";
+          scaleInput.min = "0.1";
+          scaleInput.max = "3";
+          scaleInput.step = "0.1";
+          scaleInput.value = konvaImage.scaleX();
+          const scaleNumeric = document.createElement("input");
+          scaleNumeric.type = "number";
+          scaleNumeric.min = "0.1";
+          scaleNumeric.max = "3";
+          scaleNumeric.step = "0.1";
+          scaleNumeric.value = konvaImage.scaleX();
+          scaleNumeric.classList.add("numeric-input");
+
+          const opacityLabel = document.createElement("label");
+          opacityLabel.innerText = "Opacity:";
+          const opacityInput = document.createElement("input");
+          opacityInput.type = "range";
+          opacityInput.min = "0.1";
+          opacityInput.max = "1";
+          opacityInput.step = "0.1";
+          opacityInput.value = konvaImage.opacity();
+          const opacityNumeric = document.createElement("input");
+          opacityNumeric.type = "number";
+          opacityNumeric.min = "0.1";
+          opacityNumeric.max = "1";
+          opacityNumeric.step = "0.1";
+          opacityNumeric.value = konvaImage.opacity();
+          opacityNumeric.classList.add("numeric-input");
+
+          // Delete button
+          const deleteButton = document.createElement("button");
+          deleteButton.innerText = "Delete Image";
+          deleteButton.addEventListener("click", () => {
+            konvaImage.destroy();
+            controlContainer.remove();
+            layer.draw();
+            saveImages();
+          });
+
+          // Move up button
+          const moveUpButton = document.createElement("button");
+          moveUpButton.innerText = "Move Up";
+          moveUpButton.addEventListener("click", () => {
+            konvaImage.moveUp();
+            layer.draw();
+            saveImages();
+          });
+
+          // Move down button
+          const moveDownButton = document.createElement("button");
+          moveDownButton.innerText = "Move Down";
+          moveDownButton.addEventListener("click", () => {
+            konvaImage.moveDown();
+            layer.draw();
+            saveImages();
+          });
+
+          // Event listener for scale changes
+          scaleInput.addEventListener("input", () => {
+            konvaImage.scale({ x: scaleInput.value, y: scaleInput.value });
+            scaleNumeric.value = scaleInput.value;
+            layer.draw();
+            saveImages();
+          });
+
+          scaleNumeric.addEventListener("input", () => {
+            konvaImage.scale({ x: scaleNumeric.value, y: scaleNumeric.value });
+            scaleInput.value = scaleNumeric.value;
+            layer.draw();
+            saveImages();
+          });
+
+          // Event listener for opacity changes
+          opacityInput.addEventListener("input", () => {
+            konvaImage.opacity(opacityInput.value);
+            opacityNumeric.value = opacityInput.value;
+            layer.draw();
+            saveImages();
+          });
+
+          opacityNumeric.addEventListener("input", () => {
+            konvaImage.opacity(opacityNumeric.value);
+            opacityInput.value = opacityNumeric.value;
+            layer.draw();
+            saveImages();
+          });
+
+          controlContainer.appendChild(scaleLabel);
+          controlContainer.appendChild(scaleInput);
+          controlContainer.appendChild(scaleNumeric);
+          controlContainer.appendChild(opacityLabel);
+          controlContainer.appendChild(opacityInput);
+          controlContainer.appendChild(opacityNumeric);
+          controlContainer.appendChild(moveUpButton); // Add move up button
+          controlContainer.appendChild(moveDownButton); // Add move down button
+          controlContainer.appendChild(deleteButton); // Add delete button
+          layerControls.appendChild(controlContainer);
+
+          // Add Tippy.js tooltips for better UX
+          tippy(scaleInput, { content: "Scale" });
+          tippy(opacityInput, { content: "Opacity" });
+
+          // Return scale inputs to update them later in the wheel event handler
+          return { scaleInput, scaleNumeric };
+        }
+
+        // Function to save image positions and properties
+        function saveImages() {
+          const imagesData = [];
+          layer.getChildren().forEach((imageNode) => {
+            if (imageNode instanceof Konva.Image) {
+              imagesData.push({
+                src: imageNode.image().src,
+                x: imageNode.x(),
+                y: imageNode.y(),
+                scale: imageNode.scaleX(),
+                opacity: imageNode.opacity(),
+              });
+            }
+          });
+          localforage.setItem("images", imagesData);
+        }
+
+        // Resize stage when window is resized
+        window.addEventListener("resize", () => {
+          stage.width(stageContainer.offsetWidth);
+          stage.height(stageContainer.offsetHeight);
+          layer.draw();
+        });
+      });
+    </script>
+  </body>
+</html>

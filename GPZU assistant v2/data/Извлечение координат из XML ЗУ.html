@@ -1,0 +1,773 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <title>Карта контуров</title>
+    <script src="papaparse.min.js"></script>
+    <link rel="stylesheet" href="leaflet.css" />
+    <script src="leaflet.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        color: #333;
+        display: flex;
+        flex-direction: row;
+        height: 100vh;
+      }
+      .invisible-hover-area {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 300px; /* Увеличенный размер по ширине */
+        height: 150px; /* Увеличенный размер по высоте */
+        z-index: 999; /* Обеспечиваем, что этот div будет перед другими элементами */
+      }
+
+      .invisible-hover-area:hover .exit-button {
+        transform: translateX(310px) scale(1.05);
+        background-color: #0056b3;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      }
+
+      .exit-button {
+        display: inline-block;
+        padding: 12px 24px;
+        background-color: #007bff;
+        color: white;
+        text-decoration: none;
+        border-radius: 25px;
+        font-size: 16px;
+        font-weight: bold;
+        position: fixed;
+        top: 20px;
+        left: -300px;
+        z-index: 1000;
+        transition: transform 0.4s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+        transform: translateX(110px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      }
+
+      .exit-button:active {
+        transform: translateX(310px) scale(0.95);
+        background-color: #00408f;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      }
+      .file-upload-container {
+        position: relative;
+        width: 90%;
+        padding: 20px;
+        border: 2px dashed #007bff;
+        border-radius: 10px;
+        background-color: #fff;
+        text-align: center;
+        transition: border-color 0.3s;
+      }
+
+      .file-upload-container:hover {
+        border-color: #0056b3;
+      }
+
+      .file-input {
+        display: none;
+      }
+
+      .file-label {
+        display: inline-block;
+        padding: 20px 40px;
+        color: #007bff;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        border: 2px solid #007bff;
+        border-radius: 5px;
+        background-color: #fff;
+        transition: background-color 0.3s, color 0.3s;
+      }
+
+      .file-label:hover {
+        background-color: #007bff;
+        color: #fff;
+      }
+
+      .file-label-text {
+        pointer-events: none;
+      }
+      #content-container {
+        flex: 1;
+        min-width: 20%;
+        max-width: 80%;
+        overflow: auto;
+        background-color: #f9f9f9;
+        padding: 10px;
+        box-sizing: border-box;
+      }
+      #map-container {
+        flex: 1;
+        min-width: 20%;
+        max-width: 80%;
+        height: 100%;
+        overflow: auto;
+        background-color: #e0e0e0;
+        padding: 10px;
+        box-sizing: border-box;
+        text-align: center;
+      }
+      #resizer {
+        min-width: 10px;
+        background-color: #ccc;
+        cursor: col-resize;
+        position: relative;
+      }
+
+      #resizer:hover {
+        background-color: #aaa;
+      }
+      #map {
+        height: calc(90% - 10px); /* Высота карты с учетом отступов */
+        background-color: #f9fff4; /* Фоновый цвет карты для визуализации */
+        border-radius: 8px; /* Скругленные углы для карты */
+        border: 1px solid #ccc; /* Граница для карты */
+        margin-top: 20px;
+      }
+      h1 {
+        color: #5a76a7;
+        margin-top: 0;
+      }
+      #links {
+        margin-top: 20px;
+        border-top: 2px solid #ccc;
+        padding-top: 10px;
+      }
+      a,
+      button {
+        display: inline-block;
+        padding: 10px 15px;
+        margin: 5px;
+        text-decoration: none;
+        border-radius: 5px;
+        cursor: pointer;
+        background-color: #ffffff;
+        border: 1px solid #bbb;
+        color: #333;
+        font-size: 16px; /* Увеличен размер шрифта для лучшего восприятия */
+      }
+      a:hover,
+      button:hover {
+        opacity: 0.8;
+        background-color: #e9e9e9;
+      }
+      #accordion {
+        margin-top: 20px;
+        border-radius: 5px;
+        overflow: hidden;
+      }
+      #accordion > div {
+        margin-bottom: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        overflow: hidden;
+      }
+      #accordion h3 {
+        background-color: #f0f0f0;
+        color: #333;
+        padding: 10px;
+        margin: 0;
+        cursor: pointer;
+        border-bottom: 1px solid #ddd; /* Легкая граница для разделения заголовков */
+      }
+      #accordion .content {
+        padding: 10px;
+        background-color: #fff;
+      }
+      #accordion h4 {
+        background-color: #e0e0e0;
+        color: #333;
+        padding: 8px;
+        margin: 5px 0;
+        cursor: pointer;
+      }
+      #accordion .hole-content {
+        padding: 8px;
+        background-color: #f9f9f9; /* Легкий фоновый цвет для внутреннего контента */
+      }
+      button {
+        background-color: #3c3c3c; /* Цвет кнопки */
+        color: #fff; /* Цвет текста на кнопке */
+        border: none; /* Убираем границу кнопки */
+      }
+      button:hover {
+        background-color: #0056b3; /* Темнее цвет кнопки при наведении */
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- Кнопка выхода на основную страницу -->
+
+    <div id="content-container">
+      <div class="file-upload-container" id="drop-zone">
+        <input type="file" id="file-upload" class="file-input" multiple />
+        <label for="file-upload" class="file-label">
+          <span class="file-label-text">Перетащите файлы сюда или нажмите для выбора</span>
+        </label>
+      </div>
+      <div id="links"></div>
+      <div id="accordion"></div>
+    </div>
+
+    <div id="resizer"></div>
+
+    <div id="map-container">
+      <h2>Полигоны</h2>
+      <button onclick="hideAllPolygons()">Скрыть все зоны</button>
+      <button onclick="showAllPolygons()">Показать все зоны</button>
+      <div id="map"></div>
+    </div>
+
+    <script>
+      const resizer = document.getElementById("resizer");
+      const leftPanel = document.getElementById("content-container");
+      const rightPanel = document.getElementById("map-container");
+      let isResizing = false;
+
+      resizer.addEventListener("mousedown", (e) => {
+        isResizing = true;
+        document.body.style.cursor = "col-resize";
+      });
+
+      document.addEventListener("mousemove", (e) => {
+        if (!isResizing) return;
+
+        // Ограничение минимальной и максимальной ширины
+        const containerWidth = document.body.clientWidth;
+        const leftWidth = Math.min(Math.max(e.clientX, containerWidth * 0.2), containerWidth * 0.8);
+
+        leftPanel.style.flex = `0 0 ${leftWidth}px`;
+        rightPanel.style.flex = `0 0 ${containerWidth - leftWidth}px`;
+      });
+
+      document.addEventListener("mouseup", () => {
+        if (isResizing) {
+          isResizing = false;
+          document.body.style.cursor = "default";
+        }
+      });
+
+      const colors = [
+        "#33C4FF",
+        "#8EFF33",
+        "#33FFF6",
+        "#FFD700",
+        "#6A5ACD",
+        "#20B2AA",
+        "#FFC0CB",
+        "#FFA500",
+        "#40E0D0",
+        "#9932CC",
+        "#3CB371",
+        "#0000FF",
+        "#FF1493",
+        "#00FA9A",
+        "#B0E57C",
+        "#9370DB",
+        "#00CED1",
+        "#FF8C00",
+        "#DA70D6",
+        "#98FB98",
+        "#00BFFF",
+        "#E6E6FA",
+        "#D2691E",
+        "#2E8B57",
+        "#C71585",
+        "#8B4513",
+      ];
+
+      let map = null;
+      let polygons = [];
+      let Mpolygon = [];
+
+      const fileInput = document.getElementById("file-upload");
+      const dropZone = document.getElementById("drop-zone");
+      const fileLabelText = document.querySelector(".file-label-text");
+
+      dropZone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        dropZone.classList.add("dragover");
+      });
+
+      dropZone.addEventListener("dragleave", () => {
+        dropZone.classList.remove("dragover");
+      });
+
+      dropZone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        dropZone.classList.remove("dragover");
+        handleFiles(event.dataTransfer.files);
+      });
+
+      fileInput.addEventListener("change", (event) => {
+        handleFiles(event.target.files);
+      });
+
+      function handleFiles(files) {
+        const file = files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            const parser = new DOMParser();
+            const xml = parser.parseFromString(e.target.result, "text/xml");
+            map = L.map("map", { crs: L.CRS.Simple }).setView([0, 0], 1);
+
+            // Обработка contours_location
+            const contoursLocation = xml.querySelector("contours_location");
+            if (contoursLocation) {
+              const locationContours = contoursLocation.querySelectorAll("contours > contour");
+              const groupedContours = {};
+
+              locationContours.forEach((contour, contourIndex) => {
+                const spatialElements = contour.querySelectorAll("entity_spatial > spatials_elements > spatial_element");
+                //console.log("spatialElements", spatialElements)
+                const area = contour.querySelector("area > value") ? contour.querySelector("area > value").textContent : "Не указана";
+
+                // Группируем элементы по contourIndex
+                if (!groupedContours[contourIndex]) {
+                  groupedContours[contourIndex] = {
+                    elements: [],
+                    area: area,
+                  };
+                }
+                spatialElements.forEach((element) => {
+                  groupedContours[contourIndex].elements.push(element);
+                });
+              });
+
+              // Обработка сгруппированных элементов
+              for (const [contourIndex, data] of Object.entries(groupedContours)) {
+                const isMultiPolygon = data.elements.length > 1;
+                const MainZU = true;
+                console.log("data.elements", data.elements);
+                processContours(data.elements, true, parseInt(contourIndex), data.area, isMultiPolygon, MainZU);
+              }
+            }
+
+            // Обработка objectParts
+            const objectParts = xml.querySelectorAll("object_part");
+            const objectParts_restriction_encumbrance = xml.querySelectorAll("restriction_encumbrance");
+            //console.log('objectParts_restriction_encumbrance',objectParts_restriction_encumbrance)
+            const groupedElements = {};
+
+            objectParts.forEach((part, objectIndex) => {
+              const area = part.querySelector("area > value") ? part.querySelector("area > value").textContent : "Не указана";
+              const spatialElements = part.querySelectorAll("spatial_element");
+              const parts = part.querySelector("part_number").textContent;
+              const cad_number_pkk = part.querySelector("content_restrictions > reg_numb_border > reg_number") ? part.querySelector("content_restrictions > reg_numb_border > reg_number").textContent : "Не указан";
+
+              const nameDoc = "";
+              const restrict = "";
+              const number = "";
+              const cad_number = "";
+
+              // Группируем элементы по objectIndex
+              if (!groupedElements[objectIndex]) {
+                groupedElements[objectIndex] = {
+                  elements: [],
+                  part: parts,
+                  area: area,
+                  nameDoc: nameDoc,
+                  restrict: restrict,
+                  number: number,
+                  cad_number: cad_number,
+                  cad_number_pkk: cad_number_pkk,
+                };
+              }
+
+              spatialElements.forEach((element) => {
+                groupedElements[objectIndex].elements.push(element);
+              });
+
+              objectParts_restriction_encumbrance.forEach((restriction) => {
+                const contentRestrictEncumbrancesPart = restriction.querySelector("part_number")?.textContent.trim();
+                const contentRestrictEncumbrances = restriction.querySelector("content_restrict_encumbrances")?.textContent.trim();
+                const nameDoc = restriction.querySelector("cad_link > reg_number_border > name_by_doc")?.textContent.trim();
+                const number = restriction.querySelector("cad_link > reg_number_border > number")?.textContent.trim();
+                const cad_number = restriction.querySelector("cad_link > easement_cad_numbers > cad_number")?.textContent.trim();
+
+                if (contentRestrictEncumbrances) {
+                  // Ищем элемент в groupedElements
+                  const matchingElementKey = Object.keys(groupedElements).find((key) => groupedElements[key].part === contentRestrictEncumbrancesPart);
+
+                  if (matchingElementKey) {
+                    // Обновляем значение restrict
+                    groupedElements[matchingElementKey].restrict = contentRestrictEncumbrances;
+                  }
+                }
+
+                if (nameDoc) {
+                  // Ищем элемент в groupedElements
+                  const matchingElementKey = Object.keys(groupedElements).find((key) => groupedElements[key].part === contentRestrictEncumbrancesPart);
+                  if (matchingElementKey) {
+                    // Обновляем значение restrict
+                    groupedElements[matchingElementKey].nameDoc = nameDoc;
+                  }
+                }
+
+                if (number) {
+                  // Ищем элемент в groupedElements
+                  const matchingElementKey = Object.keys(groupedElements).find((key) => groupedElements[key].part === contentRestrictEncumbrancesPart);
+                  if (matchingElementKey) {
+                    // Обновляем значение restrict
+                    groupedElements[matchingElementKey].number = number;
+                  }
+                }
+
+                if (cad_number) {
+                  // Ищем элемент в groupedElements
+                  const matchingElementKey = Object.keys(groupedElements).find((key) => groupedElements[key].part === contentRestrictEncumbrancesPart);
+                  if (matchingElementKey) {
+                    // Обновляем значение restrict
+                    groupedElements[matchingElementKey].cad_number = cad_number;
+                  }
+                }
+              });
+            });
+
+            // Обработка сгруппированных элементов
+            for (const [objectIndex, data] of Object.entries(groupedElements)) {
+              let description;
+
+              if (data.nameDoc) {
+                description = data.nameDoc;
+              } else if (data.cad_number) {
+                description = data.cad_number;
+              } else if (data.restrict) {
+                description = data.restrict;
+              } else {
+                description = "Отсутствует";
+              }
+
+              const isMultiPolygon = data.elements.length > 1;
+              console.log(groupedElements);
+              processContours(data.elements, false, parseInt(objectIndex), Math.round(data.area), isMultiPolygon, false, description);
+            }
+          };
+          reader.readAsText(file);
+        }
+      }
+
+      function updateFileLabelText() {
+        if (fileInput.files.length > 0) {
+          fileLabelText.textContent = `${fileInput.files.length} файл(ов) выбрано`;
+        } else {
+          fileLabelText.textContent = "Перетащите файлы сюда или нажмите для выбора";
+        }
+      }
+
+      function processContours(contours, setView, objectIndex = 0, area = "Не указана", isMultiPolygon, MainZU, description) {
+        if (isMultiPolygon) {
+          if (MainZU) {
+            objectIndex -= 1;
+          }
+
+          let mainPolygons = [];
+          let holes = [];
+
+          // Проверка, принадлежит ли точка полигону
+          const pointInPolygon = (point, polygon) => {
+            let [x, y] = point;
+            let inside = false;
+            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+              let [xi, yi] = polygon[i];
+              let [xj, yj] = polygon[j];
+              let intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+              if (intersect) inside = !inside;
+            }
+            return inside;
+          };
+          /*
+        // Определение площади полигона
+        const polygonArea = (polygon) => {
+            console.log(polygon)
+            let area = 0;
+            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                let [xi, yi] = polygon[i];
+                let [xj, yj] = polygon[j];
+                area += (xj + xi) * (yj - yi);
+            }
+            return Math.abs(area / 2);
+        };
+*/
+          // Обработка контуров
+          contours.forEach((element) => {
+            const coordinates = getCoordinates(element);
+
+            let isHole = mainPolygons.some((mainPolygon) => pointInPolygon(coordinates[0], mainPolygon));
+            if (isHole) {
+              //  console.log('mainPolygons', mainPolygons)
+              holes.push(coordinates);
+            } else {
+              let standalone = !mainPolygons.some((mainPolygon) => pointInPolygon(mainPolygon[0], coordinates));
+              if (standalone) mainPolygons.push(coordinates);
+
+              //  console.log('дыра', coordinates)
+            }
+          });
+
+          // Добавление основных полигонов
+          mainPolygons.forEach((polygonCoordinates, index) => {
+            //console.log('мульти полигон',polygonCoordinates)
+            let polygon = L.polygon(polygonCoordinates, { color: colors[objectIndex % colors.length] }).addTo(map);
+            Mpolygon.push(polygon);
+
+            // Привязка всплывающего окна
+            polygon.bindPopup(`
+                <b>Полигон:</b> ${objectIndex + 1}_${index + 1}<br>
+                <b>Площадь:</b> ${area}<br>
+                <b>Описание:</b> ${description || "Не указано"}
+            `);
+
+            if (setView && index === 0) map.fitBounds(polygon.getBounds());
+            addLinkWithButtons(polygonCoordinates, `contour_${objectIndex + 1}_${index + 1}.csv`, index, objectIndex, area, polygon, false, colors[objectIndex % colors.length], MainZU, description);
+          });
+
+          // Добавление дыр
+          holes.forEach((hole, holeIndex) => {
+            let holePolygon = L.polygon(hole, { color: "red" }).addTo(map);
+            Mpolygon.push(holePolygon);
+
+            // Привязка всплывающего окна
+            holePolygon.bindPopup(`
+                <b>Дыра:</b> ${objectIndex + 1}_${holeIndex + 1}<br>
+                <b>Площадь:</b> ${area}<br>
+                <b>Описание:</b> ${description || "Не указано"}
+            `);
+
+            addLinkWithButtons(hole, `hole_${objectIndex + 1}_${holeIndex + 1}.csv`, holeIndex, objectIndex, area, holePolygon, true, colors[objectIndex % colors.length], MainZU, description);
+          });
+        } else {
+          if (MainZU) {
+            objectIndex -= 1;
+          }
+
+          // Обработка одиночных полигонов
+          contours.forEach((element, index) => {
+            // console.log('обчный полигон',element)
+            const coordinates = getCoordinates(element);
+            let polygon = L.polygon(coordinates, { color: colors[objectIndex % colors.length] }).addTo(map);
+            polygons.push(polygon);
+
+            // Привязка всплывающего окна
+            polygon.bindPopup(`
+                <b>Полигон:</b> ${objectIndex + 1}_${index + 1}<br>
+                <b>Площадь:</b> ${area}<br>
+                <b>Описание:</b> ${description || "Не указано"}
+            `);
+
+            if (setView) map.fitBounds(polygon.getBounds());
+            addLinkWithButtons(coordinates, `contour_${objectIndex + 1}_${index + 1}.csv`, index, objectIndex, area, polygon, false, colors[objectIndex % colors.length], MainZU, description);
+          });
+        }
+      }
+
+      function getCoordinates(element) {
+        let coordinates = [];
+        let ordinateElements = Array.from(element.querySelectorAll("ordinate"));
+        ordinateElements.sort((a, b) => parseInt(a.querySelector("ord_nmb").textContent) - parseInt(b.querySelector("ord_nmb").textContent));
+        ordinateElements.forEach((ordinate) => {
+          coordinates.push([parseFloat(ordinate.querySelector("x").textContent), parseFloat(ordinate.querySelector("y").textContent)]);
+        });
+        //console.log("coordinates", coordinates)
+        return coordinates;
+      }
+
+      function hideAllPolygons() {
+        // Удаляем все обычные полигоны
+        polygons.forEach((polygon) => {
+          if (map.hasLayer(polygon)) {
+            map.removeLayer(polygon);
+          }
+        });
+
+        // Удаляем все мультиполигоны
+        Mpolygon.forEach((polygon) => {
+          if (map.hasLayer(polygon)) {
+            map.removeLayer(polygon);
+          }
+        });
+      }
+
+      function showAllPolygons() {
+        //console.log('showAllPolygons', polygons)
+        polygons.forEach((polygon) => {
+          map.addLayer(polygon);
+        });
+
+        Mpolygon.forEach((polygon) => {
+          map.addLayer(polygon);
+          map.fitBounds(polygon.getBounds());
+        });
+      }
+
+      function addLinkWithButtons(coordinates, filename, index, objectIndex, area, polygon, isHole = false, color, MainZU = false, description) {
+        const dataWithIndex = coordinates.map((coord, idx) => ({ id: idx + 1, x: coord[0], y: coord[1] }));
+        const csv = Papa.unparse(dataWithIndex, { header: false });
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        const showButton = document.createElement("button");
+        const hideButton = document.createElement("button");
+        const container = document.createElement("div");
+
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.textContent = `Скачать контур ${index + 1} с площадью ${area} кв. м`;
+        link.style.backgroundColor = colors[objectIndex % colors.length];
+        if (MainZU) {
+          link.style.color = "black";
+        } else {
+          link.style.color = "white";
+        }
+        showButton.textContent = "Показать на карте";
+        showButton.onclick = () => {
+          if (!map.hasLayer(polygon)) {
+            map.addLayer(polygon);
+          }
+          map.fitBounds(polygon.getBounds()); // Приближаем карту к границам полигона
+        };
+
+        hideButton.textContent = "Скрыть зону";
+        hideButton.onclick = () => {
+          if (map.hasLayer(polygon)) {
+            map.removeLayer(polygon);
+          }
+        };
+
+        container.appendChild(link);
+        container.appendChild(showButton);
+        container.appendChild(hideButton);
+
+        const accordion = document.getElementById("accordion");
+        let objectContainer = document.getElementById(`object_${objectIndex}`);
+
+        if (!objectContainer) {
+          objectContainer = document.createElement("div");
+
+          objectContainer.id = `object_${objectIndex}`;
+          const header = document.createElement("h3");
+          if (MainZU) {
+            header.textContent = `Земельный участок`;
+          } else {
+            header.innerHTML = `Часть ЗУ ${objectIndex + 1} площадь ${area} кв. м<br><br>Описание: ${description}`;
+          }
+          header.style.cursor = "pointer";
+          header.onclick = () => {
+            const content = objectContainer.querySelector(".content");
+            content.style.display = content.style.display === "none" ? "block" : "none";
+          };
+
+          header.style.backgroundColor = color; // Применяем цвет к фону заголовка
+
+          const content = document.createElement("div");
+          content.className = "content";
+          content.style.display = "none";
+
+          // Добавляем кнопку "Показать на карте весь контур"
+          const showAllButton = document.createElement("button");
+          showAllButton.textContent = "Показать на карте весь контур";
+          showAllButton.onclick = () => {
+            const polygonsInObject = polygons.concat(Mpolygon).filter((polygon) => {
+              return polygon.options.objectIndex === objectIndex;
+            });
+
+            let bounds = L.latLngBounds();
+            polygonsInObject.forEach((polygon) => {
+              if (!map.hasLayer(polygon)) {
+                map.addLayer(polygon);
+              }
+              bounds.extend(polygon.getBounds());
+            });
+
+            if (bounds.isValid()) {
+              map.fitBounds(bounds); // Приближаем карту к границам всех полигонов
+            }
+          };
+          content.appendChild(showAllButton);
+
+          objectContainer.appendChild(header);
+          objectContainer.appendChild(content);
+
+          accordion.appendChild(objectContainer);
+        }
+
+        const content = objectContainer.querySelector(".content");
+
+        if (isHole) {
+          let holeContainer = content.querySelector(".holes");
+
+          if (!holeContainer) {
+            holeContainer = document.createElement("div");
+            holeContainer.className = "holes";
+
+            const holeHeader = document.createElement("h4");
+            holeHeader.textContent = "Дыры";
+            holeHeader.style.cursor = "pointer";
+            holeHeader.onclick = () => {
+              const holeContent = holeContainer.querySelector(".hole-content");
+              holeContent.style.display = holeContent.style.display === "none" ? "block" : "none";
+            };
+
+            const holeContent = document.createElement("div");
+            holeContent.className = "hole-content";
+            holeContent.style.display = "none";
+
+            // Добавляем кнопку "Показать на карте все дыры"
+            const showAllHolesButton = document.createElement("button");
+            showAllHolesButton.textContent = "Показать на карте все дыры";
+            showAllHolesButton.onclick = () => {
+              const holesInObject = Mpolygon.filter((polygon) => {
+                return polygon.options.objectIndex === objectIndex && polygon.options.isHole;
+              });
+
+              let bounds = L.latLngBounds();
+              holesInObject.forEach((polygon) => {
+                if (!map.hasLayer(polygon)) {
+                  map.addLayer(polygon);
+                }
+                bounds.extend(polygon.getBounds());
+              });
+
+              if (bounds.isValid()) {
+                map.fitBounds(bounds); // Приближаем карту к границам всех дыр
+              }
+            };
+            holeContent.appendChild(showAllHolesButton);
+
+            holeContainer.appendChild(holeHeader);
+            holeContainer.appendChild(holeContent);
+            content.appendChild(holeContainer);
+          }
+
+          const holeContent = holeContainer.querySelector(".hole-content");
+          holeContent.appendChild(container);
+        } else {
+          content.appendChild(container);
+        }
+
+        // Добавляем объекту индекс и метку дыр
+        polygon.options.objectIndex = objectIndex;
+        if (isHole) {
+          polygon.options.isHole = true;
+        }
+
+        deleteDiv();
+      }
+
+      function deleteDiv() {
+        var element = document.querySelector(".leaflet-bottom.leaflet-right");
+        //console.log('element',element)
+        if (element) {
+          element.remove();
+        }
+      }
+    </script>
+  </body>
+</html>

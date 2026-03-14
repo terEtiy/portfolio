@@ -1,0 +1,1654 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Advanced Image Comparator | Konva.js</title>
+    <style>
+      :root {
+        --primary: #6366f1;
+        --primary-dark: #4f46e5;
+        --secondary: #8b5cf6;
+        --accent: #ec4899;
+        --bg-light: #f8fafc;
+        --bg-dark: #0f172a;
+        --surface-light: #ffffff;
+        --surface-dark: #1e293b;
+        --text-light: #334155;
+        --text-dark: #e2e8f0;
+        --border-light: #e2e8f0;
+        --border-dark: #334155;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --radius: 12px;
+        --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: var(--text-light);
+        overflow: hidden;
+        transition: var(--transition);
+      }
+
+      body.dark-mode {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        color: var(--text-dark);
+      }
+
+      #stage-container {
+        width: 100vw;
+        height: 100vh;
+        background: var(--surface-light);
+      }
+
+      body.dark-mode #stage-container {
+        background: var(--bg-dark);
+      }
+
+      /* Основная панель управления */
+      #controls {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        width: 450px;
+        max-height: 90vh;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        z-index: 100;
+        overflow: hidden;
+        transition: var(--transition);
+        transform-origin: top right;
+      }
+
+      body.dark-mode #controls {
+        background: rgba(30, 41, 59, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      #controls.minimized {
+        width: 450px;
+        height: 75px;
+        border-radius: 10px;
+      }
+
+      /* Заголовок панели */
+      .controls-header {
+        padding: 20px;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: white;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: relative;
+        overflow: hidden;
+      }
+
+      @keyframes shimmer {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(100%);
+        }
+      }
+
+      .controls-title {
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .controls-title::before {
+        content: "🎨";
+        font-size: 20px;
+      }
+
+      .controls-toggle {
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: var(--transition);
+        font-size: 16px;
+      }
+
+      .controls-toggle:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: rotate(90deg);
+      }
+
+      /* Контент панели */
+      #controlsContent {
+        padding: 20px;
+        max-height: calc(90vh - 70px);
+        overflow-y: auto;
+      }
+
+      /* Загрузка файлов */
+      #fileInputWrapper {
+        background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+        border: 2px dashed var(--primary);
+        border-radius: var(--radius);
+        padding: 30px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: var(--transition);
+        margin-bottom: 20px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      body.dark-mode #fileInputWrapper {
+        background: linear-gradient(135deg, #1e3a8a, #1e40af);
+        border-color: var(--secondary);
+      }
+
+      #fileInputWrapper:hover {
+        transform: translateY(-2px);
+        border-color: var(--primary-dark);
+        box-shadow: 0 20px 40px -15px rgba(99, 102, 241, 0.3);
+      }
+
+      #fileInputWrapper.dragover {
+        background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+        border-color: var(--accent);
+      }
+
+      #fileInputWrapper::before {
+        content: "📤";
+        font-size: 40px;
+        display: block;
+        margin-bottom: 15px;
+        animation: float 3s ease-in-out infinite;
+      }
+
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-10px);
+        }
+      }
+
+      /* Управление слоями */
+      .layer-control {
+        background: var(--surface-light);
+        border-radius: var(--radius);
+        padding: 15px;
+        margin-bottom: 15px;
+        border: 1px solid var(--border-light);
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+      }
+
+      body.dark-mode .layer-control {
+        background: var(--surface-dark);
+        border-color: var(--border-dark);
+      }
+
+      .layer-control.active {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+      }
+
+      .layer-control.active::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: linear-gradient(to bottom, var(--primary), var(--secondary));
+      }
+
+      .layer-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--border-light);
+      }
+
+      body.dark-mode .layer-header {
+        border-bottom-color: var(--border-dark);
+      }
+
+      .layer-title {
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--primary);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        max-width: 200px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .layer-title::before {
+        content: "🖼️";
+      }
+
+      .layer-status {
+        font-size: 12px;
+        padding: 4px 8px;
+        border-radius: 20px;
+        background: var(--primary);
+        color: white;
+      }
+
+      /* Элементы управления */
+      .control-group {
+        margin-bottom: 12px;
+      }
+
+      .control-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        font-size: 12px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-light);
+      }
+
+      body.dark-mode .control-label {
+        color: var(--text-dark);
+      }
+
+      .control-value {
+        color: var(--primary);
+        font-weight: 600;
+      }
+
+      .control-slider {
+        width: 100%;
+        height: 6px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: linear-gradient(to right, var(--border-light), var(--primary));
+        border-radius: 3px;
+        outline: none;
+      }
+
+      .control-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--primary);
+        cursor: pointer;
+        border: 3px solid white;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        transition: var(--transition);
+      }
+
+      .control-slider::-webkit-slider-thumb:hover {
+        transform: scale(1.2);
+        background: var(--primary-dark);
+      }
+
+      /* Кнопки */
+      .btn {
+        padding: 10px 16px;
+        border: none;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: var(--transition);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        letter-spacing: 0.5px;
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      }
+
+      .btn:active {
+        transform: translateY(0);
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: linear-gradient(135deg, var(--primary-dark), var(--secondary));
+      }
+
+      .btn-danger {
+        background: linear-gradient(135deg, var(--danger), #f43f5e);
+        color: white;
+      }
+
+      .btn-success {
+        background: linear-gradient(135deg, var(--success), #34d399);
+        color: white;
+      }
+
+      .btn-outline {
+        background: transparent;
+        border: 2px solid var(--border-light);
+        color: var(--text-light);
+      }
+
+      body.dark-mode .btn-outline {
+        border-color: var(--border-dark);
+        color: var(--text-dark);
+      }
+
+      .btn-outline:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+      }
+
+      /* Кнопки управления */
+      .control-buttons {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-top: 15px;
+      }
+
+      /* Глобальные настройки */
+      #globalControls {
+        background: var(--surface-light);
+        border-radius: var(--radius);
+        padding: 20px;
+        margin-top: 20px;
+        border: 1px solid var(--border-light);
+      }
+
+      body.dark-mode #globalControls {
+        background: var(--surface-dark);
+        border-color: var(--border-dark);
+      }
+
+      #globalControls h4 {
+        margin: 0 0 15px 0;
+        color: var(--primary);
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      #globalControls h4::before {
+        content: "⚙️";
+      }
+
+      .global-controls-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+      }
+
+      /* Отображение масштаба */
+      .zoom-display {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 10px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        backdrop-filter: blur(10px);
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        animation: slideUp 0.3s ease-out;
+      }
+
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .zoom-display::before {
+        content: "🔍";
+      }
+
+      /* Индикатор загрузки */
+      .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(5px);
+      }
+
+      body.dark-mode .loading-overlay {
+        background: rgba(15, 23, 42, 0.9);
+      }
+
+      .spinner {
+        width: 50px;
+        height: 50px;
+        border: 3px solid var(--border-light);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Уведомления */
+      .notification {
+        position: fixed;
+        bottom: 80px;
+        right: 20px;
+        background: var(--success);
+        color: white;
+        padding: 12px 20px;
+        border-radius: var(--radius);
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: var(--shadow);
+        z-index: 100;
+        animation: slideIn 0.3s ease-out;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateX(100%);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      /* Адаптивность */
+      @media (max-width: 768px) {
+        #controls {
+          width: calc(100% - 40px);
+          right: 20px;
+          left: 20px;
+          top: 10px;
+        }
+
+        #controls.minimized {
+          width: 50px;
+          height: 50px;
+          top: 10px;
+          right: 10px;
+        }
+
+        .global-controls-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .control-buttons {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      #controlsContent::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+
+      #controlsContent::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 5px;
+        margin: 5px 0;
+      }
+
+      body.dark-mode #controlsContent::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      #controlsContent::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        border-radius: 5px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+        transition: var(--transition);
+      }
+
+      #controlsContent::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, var(--primary-dark), var(--secondary));
+        background-clip: content-box;
+      }
+
+      #controlsContent::-webkit-scrollbar-corner {
+        background: transparent;
+      }
+
+      /* Для Firefox */
+      #controlsContent {
+        scrollbar-width: thin;
+        scrollbar-color: var(--primary) rgba(0, 0, 0, 0.05);
+      }
+
+      body.dark-mode #controlsContent {
+        scrollbar-color: var(--primary) rgba(255, 255, 255, 0.05);
+      }
+      .control-input {
+        width: 100%;
+        padding: 5px 15px;
+        border: 2px solid var(--border-light);
+        border-radius: 8px;
+        background: var(--surface-light);
+        color: var(--text-light);
+        font-family: "Inter", sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        transition: var(--transition);
+        outline: none;
+        margin-top: 10px;
+      }
+
+      body.dark-mode .control-input {
+        background: var(--surface-dark);
+        border-color: var(--border-dark);
+        color: var(--text-dark);
+      }
+
+      .control-input:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        transform: translateY(-1px);
+      }
+
+      .control-input::placeholder {
+        color: #94a3b8;
+        font-weight: 400;
+      }
+
+      body.dark-mode .control-input::placeholder {
+        color: #64748b;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage-container"></div>
+
+    <div id="controls">
+      <div class="controls-header">
+        <span class="controls-title">Image Comparator</span>
+        <button class="controls-toggle" id="toggleControls">◀</button>
+      </div>
+
+      <div id="controlsContent">
+        <div id="fileInputWrapper">
+          📤 Перетащите файлы или нажмите для загрузки
+          <input type="file" id="fileInput" multiple accept="image/*" style="display: none" />
+        </div>
+
+        <div id="globalControls">
+          <h4>Глобальные настройки</h4>
+          <div class="global-controls-grid">
+            <button class="btn btn-outline" id="resetView"><span>⟳</span> Сброс</button>
+            <button class="btn btn-outline" id="toggleGrid"><span>#</span> Сетка</button>
+            <button class="btn btn-outline" id="saveSession"><span>💾</span> Сохранить</button>
+            <button class="btn btn-outline" id="loadSession"><span>📂</span> Загрузить</button>
+            <button class="btn btn-outline" id="exportImage"><span>📤</span> Экспорт</button>
+            <button class="btn btn-outline" id="toggleTheme"><span>🌙</span> Тема</button>
+          </div>
+        </div>
+
+        <div id="layerControls">
+          <!-- Контролы для каждого изображения будут добавляться здесь -->
+        </div>
+      </div>
+    </div>
+
+    <div class="zoom-display" id="zoomDisplay">Масштаб: 100%</div>
+
+    <!-- Модальное окно загрузки -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none">
+      <div class="spinner"></div>
+      <p>Загрузка изображений...</p>
+    </div>
+
+    <!-- Скрипты -->
+    <script src="popper.min.js"></script>
+    <script src="konva.min.js"></script>
+    <script src="tippy-bundle.iife.min.js"></script>
+    <script src="localforage.min.js"></script>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        // Инициализация темной темы
+        if (localStorage.getItem("darkMode") === "true") {
+          document.body.classList.add("dark-mode");
+        }
+
+        // Показать уведомление
+        function showNotification(message, type = "success") {
+          const notification = document.createElement("div");
+          notification.className = `notification ${type}`;
+          notification.innerHTML = `
+                          <span>${type === "success" ? "✅" : "⚠️"}</span>
+                          ${message}
+                      `;
+          document.body.appendChild(notification);
+
+          setTimeout(() => {
+            notification.style.opacity = "0";
+            notification.style.transform = "translateX(100%)";
+            setTimeout(() => notification.remove(), 300);
+          }, 3000);
+        }
+
+        // Показать/скрыть загрузку
+        function showLoading() {
+          document.getElementById("loadingOverlay").style.display = "flex";
+        }
+
+        function hideLoading() {
+          document.getElementById("loadingOverlay").style.display = "none";
+        }
+
+        // Инициализация тултипов
+        tippy("[title]", {
+          theme: "material",
+          animation: "scale",
+          duration: [200, 150],
+          arrow: true,
+        });
+      });
+
+      class ImageManager {
+        constructor() {
+          this.images = new Map();
+          this.selectedImage = null;
+          this.imageCounter = 0;
+        }
+
+        addImage(konvaImage, fileData = null) {
+          const id = `image_${Date.now()}_${this.imageCounter++}`;
+          const imageData = {
+            id,
+            konvaImage,
+            fileData,
+            controls: null,
+            name: fileData?.name || `Изображение ${this.imageCounter}`,
+          };
+
+          this.images.set(id, imageData);
+          return imageData;
+        }
+
+        removeImage(id) {
+          const imageData = this.images.get(id);
+          if (imageData) {
+            imageData.konvaImage.destroy();
+            if (imageData.controls) {
+              imageData.controls.container.remove();
+            }
+            this.images.delete(id);
+          }
+
+          if (this.selectedImage?.id === id) {
+            this.selectedImage = null;
+          }
+        }
+
+        selectImage(id) {
+          const imageData = this.images.get(id);
+          if (imageData) {
+            this.selectedImage = imageData;
+            return imageData;
+          }
+          return null;
+        }
+
+        getImage(id) {
+          return this.images.get(id);
+        }
+
+        getAllImages() {
+          return Array.from(this.images.values());
+        }
+
+        clearAll() {
+          this.images.forEach((imageData) => {
+            imageData.konvaImage.destroy();
+            if (imageData.controls) {
+              imageData.controls.container.remove();
+            }
+          });
+          this.images.clear();
+          this.selectedImage = null;
+        }
+
+        moveUp(id) {
+          const imageData = this.images.get(id);
+          if (imageData) {
+            imageData.konvaImage.moveUp();
+            return true;
+          }
+          return false;
+        }
+
+        moveDown(id) {
+          const imageData = this.images.get(id);
+          if (imageData) {
+            imageData.konvaImage.moveDown();
+            return true;
+          }
+          return false;
+        }
+
+        bringToFront(id) {
+          const imageData = this.images.get(id);
+          if (imageData) {
+            imageData.konvaImage.moveToTop();
+            return true;
+          }
+          return false;
+        }
+
+        sendToBack(id) {
+          const imageData = this.images.get(id);
+          if (imageData) {
+            imageData.konvaImage.moveToBottom();
+            return true;
+          }
+          return false;
+        }
+      }
+
+      class ControlManager {
+        constructor(imageManager, layerControlsContainer) {
+          this.imageManager = imageManager;
+          this.container = layerControlsContainer;
+          this.controls = new Map();
+        }
+
+        createControls(imageData) {
+          const container = document.createElement("div");
+          container.className = "layer-control";
+          container.dataset.imageId = imageData.id;
+
+          const header = document.createElement("div");
+          header.className = "layer-header";
+
+          const title = document.createElement("div");
+          title.className = "layer-title";
+          title.title = imageData.name;
+          title.textContent = imageData.name;
+
+          const visibilityBtn = document.createElement("button");
+          visibilityBtn.className = "btn btn-outline";
+          visibilityBtn.innerHTML = "👁";
+          visibilityBtn.style.padding = "2px 6px";
+          visibilityBtn.title = "Скрыть/показать";
+
+          header.appendChild(title);
+          header.appendChild(visibilityBtn);
+          container.appendChild(header);
+
+          // Группа управления масштабом
+          const scaleGroup = this.createControlGroup("Масштаб:", "scale", imageData.konvaImage.scaleX(), 0.1, 5, 0.01, (value) => {
+            imageData.konvaImage.scale({ x: value, y: value });
+            imageData.konvaImage.getLayer().batchDraw();
+            ImageComparator.instance.saveSession();
+          });
+
+          // Группа управления прозрачностью
+          const opacityGroup = this.createControlGroup("Прозрачность:", "opacity", imageData.konvaImage.opacity(), 0.1, 1, 0.01, (value) => {
+            imageData.konvaImage.opacity(value);
+            imageData.konvaImage.getLayer().batchDraw();
+            ImageComparator.instance.saveSession();
+          });
+
+          // Группа управления поворотом
+          const rotationGroup = this.createControlGroup("Поворот:", "rotation", imageData.konvaImage.rotation(), 0, 360, 1, (value) => {
+            imageData.konvaImage.rotation(value);
+            imageData.konvaImage.getLayer().batchDraw();
+            ImageComparator.instance.saveSession();
+          });
+
+          container.appendChild(scaleGroup);
+          container.appendChild(opacityGroup);
+          container.appendChild(rotationGroup);
+
+          // Кнопки управления
+          const buttonsContainer = document.createElement("div");
+          buttonsContainer.className = "control-buttons";
+
+          const buttons = [
+            { text: "↑ Вверх", class: "btn-outline", action: () => this.imageManager.moveUp(imageData.id) },
+            { text: "↓ Вниз", class: "btn-outline", action: () => this.imageManager.moveDown(imageData.id) },
+            { text: "Наверх", class: "btn-outline", action: () => this.imageManager.bringToFront(imageData.id) },
+            { text: "Фон", class: "btn-outline", action: () => this.imageManager.sendToBack(imageData.id) },
+            {
+              text: "В центр",
+              class: "btn-outline",
+              action: () => {
+                imageData.konvaImage.position({
+                  x: ImageComparator.instance.stage.width() / 2 - (imageData.konvaImage.width() * imageData.konvaImage.scaleX()) / 2,
+                  y: ImageComparator.instance.stage.height() / 2 - (imageData.konvaImage.height() * imageData.konvaImage.scaleY()) / 2,
+                });
+                imageData.konvaImage.getLayer().batchDraw();
+                ImageComparator.instance.saveSession();
+              },
+            },
+            { text: "✕ Удалить", class: "btn-danger", action: () => this.imageManager.removeImage(imageData.id) },
+          ];
+
+          buttons.forEach((btnConfig) => {
+            const button = document.createElement("button");
+            button.className = `btn ${btnConfig.class}`;
+            button.textContent = btnConfig.text;
+            button.addEventListener("click", btnConfig.action);
+            buttonsContainer.appendChild(button);
+          });
+
+          container.appendChild(buttonsContainer);
+
+          // Обработчик видимости
+          visibilityBtn.addEventListener("click", () => {
+            const visible = imageData.konvaImage.visible();
+            imageData.konvaImage.visible(!visible);
+            visibilityBtn.innerHTML = visible ? "👁" : "👁‍🗨";
+            visibilityBtn.title = visible ? "Показать" : "Скрыть";
+            imageData.konvaImage.getLayer().batchDraw();
+            ImageComparator.instance.saveSession();
+          });
+
+          // Обработчик клика для выделения
+          container.addEventListener("click", (e) => {
+            if (!e.target.closest("button") && !e.target.closest("input")) {
+              this.selectImage(imageData.id);
+            }
+          });
+
+          this.container.appendChild(container);
+
+          const controls = {
+            container,
+            scale: scaleGroup.querySelector('input[type="range"]'),
+            scaleInput: scaleGroup.querySelector('input[type="number"]'),
+            opacity: opacityGroup.querySelector('input[type="range"]'),
+            opacityInput: opacityGroup.querySelector('input[type="number"]'),
+            rotation: rotationGroup.querySelector('input[type="range"]'),
+            rotationInput: rotationGroup.querySelector('input[type="number"]'),
+          };
+
+          this.controls.set(imageData.id, controls);
+          return controls;
+        }
+
+        createControlGroup(label, name, value, min, max, step, onChange) {
+          const group = document.createElement("div");
+          group.className = "control-group";
+
+          const row = document.createElement("div");
+          row.className = "control-row";
+
+          const labelEl = document.createElement("div");
+          labelEl.className = "control-label";
+          labelEl.textContent = label;
+
+          const slider = document.createElement("input");
+          slider.type = "range";
+          slider.className = "control-slider";
+          slider.min = min;
+          slider.max = max;
+          slider.step = step;
+          slider.value = value;
+          slider.dataset.control = name;
+
+          const input = document.createElement("input");
+          input.type = "number";
+          input.className = "control-input";
+          input.min = min;
+          input.max = max;
+          input.step = step;
+          input.value = parseFloat(value).toFixed(2);
+          input.dataset.control = name;
+
+          // Синхронизация значений
+          const updateValue = (newValue, source) => {
+            const val = parseFloat(newValue);
+            slider.value = val;
+            input.value = val.toFixed(2);
+            onChange(val);
+          };
+
+          slider.addEventListener("input", (e) => updateValue(e.target.value, "slider"));
+          input.addEventListener("input", (e) => updateValue(e.target.value, "input"));
+          input.addEventListener("change", (e) => updateValue(e.target.value, "input"));
+
+          row.appendChild(labelEl);
+          row.appendChild(slider);
+          row.appendChild(input);
+          group.appendChild(row);
+
+          return group;
+        }
+
+        selectImage(imageId) {
+          // Снимаем выделение со всех контролов
+          this.controls.forEach((control, id) => {
+            control.container.classList.remove("layer-active");
+          });
+
+          // Выделяем выбранный контрол
+          const control = this.controls.get(imageId);
+          if (control) {
+            control.container.classList.add("layer-active");
+          }
+
+          // Выделяем изображение на канвасе
+          const imageData = this.imageManager.selectImage(imageId);
+          if (imageData && ImageComparator.instance.transformer) {
+            ImageComparator.instance.transformer.nodes([imageData.konvaImage]);
+            ImageComparator.instance.transformer.show();
+            imageData.konvaImage.getLayer().batchDraw();
+          }
+        }
+
+        updateControl(imageId, property, value) {
+          const control = this.controls.get(imageId);
+          if (control && control[property]) {
+            control[property].value = value;
+            control[property].dispatchEvent(new Event("input"));
+          }
+        }
+
+        removeControls(imageId) {
+          const control = this.controls.get(imageId);
+          if (control) {
+            control.container.remove();
+            this.controls.delete(imageId);
+          }
+        }
+
+        clearAll() {
+          this.controls.forEach((control) => control.container.remove());
+          this.controls.clear();
+        }
+      }
+
+      class ImageComparator {
+        static instance = null;
+
+        constructor() {
+          if (ImageComparator.instance) {
+            return ImageComparator.instance;
+          }
+
+          this.stage = null;
+          this.layer = null;
+          this.transformer = null;
+          this.gridLayer = null;
+          this.imageManager = null;
+          this.controlManager = null;
+          this.isGridVisible = false;
+          this.isDarkMode = false;
+          this.zoomLevel = 1;
+
+          this.init();
+          ImageComparator.instance = this;
+        }
+
+        init() {
+          this.initStage();
+          this.initManagers();
+          this.initEventListeners();
+          this.initTransformer();
+          this.initPanning();
+          this.loadSession();
+          this.updateZoomDisplay();
+        }
+
+        initStage() {
+          const stageContainer = document.getElementById("stage-container");
+          this.stage = new Konva.Stage({
+            container: "stage-container",
+            width: stageContainer.offsetWidth,
+            height: stageContainer.offsetHeight,
+          });
+
+          this.layer = new Konva.Layer();
+          this.stage.add(this.layer);
+
+          // Слой для сетки
+          this.gridLayer = new Konva.Layer();
+          this.stage.add(this.gridLayer);
+          this.drawGrid();
+        }
+
+        initPanning() {
+          console.log("debug_1");
+          let isPanning = false;
+          let lastPointerPosition = null;
+          let scale = 1;
+
+          // Включаем/выключаем панорамирование по ПКМ или Alt+ЛКМ
+          this.stage.on("mousedown touchstart", (e) => {
+            // Проверяем, если это правая кнопка мыши или Alt+левая кнопка
+            const isRightClick = e.evt.button === 2;
+            const isAltLeftClick = e.evt.altKey && e.evt.button === 0;
+
+            if (isRightClick || isAltLeftClick) {
+              e.evt.preventDefault();
+              isPanning = true;
+              lastPointerPosition = this.stage.getPointerPosition();
+              document.body.style.cursor = "grabbing";
+            }
+          });
+
+          // Панорамирование при движении мыши
+          this.stage.on("mousemove touchmove", (e) => {
+            if (!isPanning) return;
+
+            e.evt.preventDefault();
+            const currentPointerPosition = this.stage.getPointerPosition();
+
+            if (lastPointerPosition && currentPointerPosition) {
+              const dx = currentPointerPosition.x - lastPointerPosition.x;
+              const dy = currentPointerPosition.y - lastPointerPosition.y;
+
+              // Обновляем позицию сцены
+              const newPos = {
+                x: this.stage.x() + dx,
+                y: this.stage.y() + dy,
+              };
+
+              this.stage.position(newPos);
+              this.stage.batchDraw();
+              lastPointerPosition = currentPointerPosition;
+            }
+          });
+
+          // Завершение панорамирования
+          this.stage.on("mouseup touchend mouseleave", () => {
+            if (isPanning) {
+              isPanning = false;
+              document.body.style.cursor = "default";
+              this.saveSession();
+            }
+          });
+
+          // Отключаем контекстное меню на правый клик
+          this.stage.container().addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+          });
+
+          // Индикатор режима панорамирования
+          this.stage.on("mouseover", () => {
+            if (!isPanning) {
+              document.body.style.cursor = "grab";
+            }
+          });
+
+          this.stage.on("mouseout", () => {
+            if (!isPanning) {
+              document.body.style.cursor = "default";
+            }
+          });
+        }
+
+        initManagers() {
+          this.imageManager = new ImageManager();
+          this.controlManager = new ControlManager(this.imageManager, document.getElementById("layerControls"));
+        }
+
+        initTransformer() {
+          this.transformer = new Konva.Transformer({
+            rotateEnabled: true,
+            borderEnabled: true,
+            borderStroke: "#007bff",
+            borderStrokeWidth: 2,
+            anchorStroke: "#007bff",
+            anchorFill: "#ffffff",
+            anchorSize: 8,
+            keepRatio: false,
+            enabledAnchors: ["top-left", "top-right", "bottom-left", "bottom-right", "rotater"],
+            boundBoxFunc: (oldBox, newBox) => {
+              newBox.width = Math.max(30, newBox.width);
+              newBox.height = Math.max(30, newBox.height);
+              return newBox;
+            },
+          });
+
+          this.layer.add(this.transformer);
+          this.transformer.hide();
+
+          // Обработка изменений через трансформер
+          this.transformer.on("transform", () => {
+            const node = this.transformer.nodes()[0];
+            if (node) {
+              const imageData = Array.from(this.imageManager.images.values()).find((img) => img.konvaImage === node);
+
+              if (imageData) {
+                this.controlManager.updateControl(imageData.id, "scale", node.scaleX());
+                this.controlManager.updateControl(imageData.id, "rotation", node.rotation());
+                this.saveSession();
+              }
+            }
+          });
+
+          // Клик на сцене для снятия выделения
+          this.stage.on("click", (e) => {
+            if (e.target === this.stage) {
+              this.transformer.hide();
+              this.transformer.nodes([]);
+              this.controlManager.selectImage(null);
+              this.stage.batchDraw();
+            }
+          });
+        }
+
+        initEventListeners() {
+          const fileInputWrapper = document.getElementById("fileInputWrapper");
+          const fileInput = document.getElementById("fileInput");
+
+          // Загрузка файлов
+          fileInputWrapper.addEventListener("click", () => fileInput.click());
+
+          fileInputWrapper.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            fileInputWrapper.classList.add("dragover");
+          });
+
+          fileInputWrapper.addEventListener("dragleave", () => {
+            fileInputWrapper.classList.remove("dragover");
+          });
+
+          fileInputWrapper.addEventListener("drop", (e) => {
+            e.preventDefault();
+            fileInputWrapper.classList.remove("dragover");
+            this.handleFiles(e.dataTransfer.files);
+          });
+
+          fileInput.addEventListener("change", (e) => {
+            this.handleFiles(e.target.files);
+          });
+
+          // Буфер обмена
+          document.addEventListener("paste", (e) => this.handlePaste(e));
+
+          // Глобальные контролы
+          document.getElementById("resetView").addEventListener("click", () => this.resetView());
+          document.getElementById("toggleGrid").addEventListener("click", () => this.toggleGrid());
+          document.getElementById("saveSession").addEventListener("click", () => this.saveSession(true));
+          document.getElementById("loadSession").addEventListener("click", () => this.loadSession());
+          document.getElementById("exportImage").addEventListener("click", () => this.exportImage());
+          document.getElementById("toggleTheme").addEventListener("click", () => this.toggleTheme());
+          document.getElementById("toggleControls").addEventListener("click", () => this.toggleControls());
+
+          // Клавиатура
+          document.addEventListener("keydown", (e) => this.handleKeyDown(e));
+
+          // Изменение размера окна
+          window.addEventListener("resize", () => this.handleResize());
+
+          // Масштабирование колесом мыши
+          this.stage.container().addEventListener("wheel", (e) => this.handleWheel(e));
+        }
+
+        handleFiles(files) {
+          Array.from(files).forEach((file) => {
+            if (!file.type.startsWith("image/")) {
+              alert(`Файл "${file.name}" не является изображением`);
+              return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              this.addImage(e.target.result, file);
+            };
+            reader.readAsDataURL(file);
+          });
+        }
+
+        handlePaste(event) {
+          const items = event.clipboardData?.items;
+          if (!items) return;
+
+          for (let item of items) {
+            if (item.type.startsWith("image/")) {
+              const blob = item.getAsFile();
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                this.addImage(e.target.result, { name: "Из буфера" });
+              };
+              reader.readAsDataURL(blob);
+              break;
+            }
+          }
+        }
+
+        addImage(src, fileData = null) {
+          const img = new Image();
+          img.src = src;
+
+          img.onload = () => {
+            const konvaImage = new Konva.Image({
+              x: this.stage.width() / 2 - img.width / 2,
+              y: this.stage.height() / 2 - img.height / 2,
+              image: img,
+              draggable: true,
+              name: "image",
+            });
+
+            // Добавляем обработчики событий
+            konvaImage.on("click", (e) => {
+              e.cancelBubble = true;
+              const imageData = this.imageManager.getAllImages().find((imgData) => imgData.konvaImage === e.target);
+              if (imageData) {
+                this.controlManager.selectImage(imageData.id);
+              }
+            });
+
+            konvaImage.on("dragmove", () => {
+              this.saveSession();
+            });
+
+            konvaImage.on("wheel", (e) => {
+              if (e.evt.shiftKey) {
+                e.evt.preventDefault();
+                const delta = e.evt.deltaY > 0 ? -0.01 : 0.01;
+                const newScale = Math.max(0.1, Math.min(5, konvaImage.scaleX() + delta));
+                konvaImage.scale({ x: newScale, y: newScale });
+                this.controlManager.updateControl(this.imageManager.getAllImages().find((img) => img.konvaImage === konvaImage)?.id, "scale", newScale);
+                this.layer.batchDraw();
+                this.saveSession();
+                this.updateZoomDisplay();
+              }
+            });
+
+            this.layer.add(konvaImage);
+
+            // Добавляем в менеджер
+            const imageData = this.imageManager.addImage(konvaImage, fileData);
+
+            // Создаем контролы
+            imageData.controls = this.controlManager.createControls(imageData);
+
+            // Выделяем новое изображение
+            this.controlManager.selectImage(imageData.id);
+
+            this.layer.batchDraw();
+            this.saveSession();
+          };
+        }
+
+        handleKeyDown(event) {
+          if (!this.imageManager.selectedImage) return;
+
+          const image = this.imageManager.selectedImage.konvaImage;
+          const moveAmount = event.shiftKey ? 10 : 1;
+
+          switch (event.key) {
+            case "ArrowUp":
+              image.y(image.y() - moveAmount);
+              break;
+            case "ArrowDown":
+              image.y(image.y() + moveAmount);
+              break;
+            case "ArrowLeft":
+              image.x(image.x() - moveAmount);
+              break;
+            case "ArrowRight":
+              image.x(image.x() + moveAmount);
+              break;
+            case "Delete":
+            case "Backspace":
+              this.imageManager.removeImage(this.imageManager.selectedImage.id);
+              break;
+            case "[":
+              image.moveDown();
+              break;
+            case "]":
+              image.moveUp();
+              break;
+            case "{":
+              image.moveToBottom();
+              break;
+            case "}":
+              image.moveToTop();
+              break;
+          }
+
+          if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "[", "]", "{", "}"].includes(event.key)) {
+            event.preventDefault();
+            this.layer.batchDraw();
+            this.saveSession();
+          }
+        }
+
+        handleWheel(event) {
+          if (event.ctrlKey) {
+            event.preventDefault();
+            const scaleBy = 1.1;
+            const oldScale = this.stage.scaleX();
+            const pointer = this.stage.getPointerPosition();
+
+            const mousePointTo = {
+              x: (pointer.x - this.stage.x()) / oldScale,
+              y: (pointer.y - this.stage.y()) / oldScale,
+            };
+
+            const newScale = event.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy;
+
+            this.stage.scale({ x: newScale, y: newScale });
+
+            const newPos = {
+              x: pointer.x - mousePointTo.x * newScale,
+              y: pointer.y - mousePointTo.y * newScale,
+            };
+
+            this.stage.position(newPos);
+            this.zoomLevel = newScale;
+            this.updateZoomDisplay();
+            this.stage.batchDraw();
+          }
+        }
+
+        handleResize() {
+          const container = document.getElementById("stage-container");
+          this.stage.width(container.offsetWidth);
+          this.stage.height(container.offsetHeight);
+          this.drawGrid();
+          this.stage.batchDraw();
+        }
+
+        drawGrid() {
+          this.gridLayer.destroyChildren();
+
+          if (!this.isGridVisible) return;
+
+          const gridSize = 50;
+          const width = this.stage.width();
+          const height = this.stage.height();
+
+          // Вертикальные линии
+          for (let x = 0; x <= width; x += gridSize) {
+            const line = new Konva.Line({
+              points: [x, 0, x, height],
+              stroke: this.isDarkMode ? "#404040" : "#e0e0e0",
+              strokeWidth: 1,
+              dash: [5, 5],
+            });
+            this.gridLayer.add(line);
+          }
+
+          // Горизонтальные линии
+          for (let y = 0; y <= height; y += gridSize) {
+            const line = new Konva.Line({
+              points: [0, y, width, y],
+              stroke: this.isDarkMode ? "#404040" : "#e0e0e0",
+              strokeWidth: 1,
+              dash: [5, 5],
+            });
+            this.gridLayer.add(line);
+          }
+
+          this.gridLayer.batchDraw();
+        }
+
+        toggleGrid() {
+          this.isGridVisible = !this.isGridVisible;
+          this.drawGrid();
+          document.getElementById("toggleGrid").textContent = this.isGridVisible ? "Скрыть сетку" : "Показать сетку";
+          this.saveSession();
+        }
+
+        toggleTheme() {
+          this.isDarkMode = !this.isDarkMode;
+          document.body.classList.toggle("dark-mode", this.isDarkMode);
+          document.getElementById("toggleTheme").textContent = this.isDarkMode ? "Светлая тема" : "Темная тема";
+          this.drawGrid();
+          localStorage.setItem("imageComparatorDarkMode", this.isDarkMode);
+        }
+
+        toggleControls() {
+          const controls = document.getElementById("controls");
+          const toggleBtn = document.getElementById("toggleControls");
+
+          if (controls.classList.contains("minimized")) {
+            controls.classList.remove("minimized");
+            toggleBtn.textContent = "◀";
+          } else {
+            controls.classList.add("minimized");
+            toggleBtn.textContent = "▶";
+          }
+        }
+
+        resetView() {
+          this.stage.scale({ x: 1, y: 1 });
+          this.stage.position({ x: 0, y: 0 });
+          this.zoomLevel = 1;
+          this.updateZoomDisplay();
+          this.stage.batchDraw();
+        }
+
+        updateZoomDisplay() {
+          const display = document.getElementById("zoomDisplay");
+          display.textContent = `Масштаб: ${Math.round(this.zoomLevel * 100)}%`;
+        }
+
+        async saveSession(showNotification = false) {
+          const sessionData = {
+            images: this.imageManager.getAllImages().map((imgData) => ({
+              src: imgData.konvaImage.image().src,
+              x: imgData.konvaImage.x(),
+              y: imgData.konvaImage.y(),
+              scale: imgData.konvaImage.scaleX(),
+              opacity: imgData.konvaImage.opacity(),
+              rotation: imgData.konvaImage.rotation(),
+              visible: imgData.konvaImage.visible(),
+              name: imgData.name,
+            })),
+            darkMode: this.isDarkMode,
+            gridVisible: this.isGridVisible,
+            zoomLevel: this.zoomLevel,
+            stagePosition: this.stage.position(),
+            stageScale: this.stage.scale(),
+          };
+
+          await localforage.setItem("imageComparatorSession", sessionData);
+
+          if (showNotification) {
+            alert("Сессия сохранена!");
+          }
+        }
+
+        async loadSession() {
+          const sessionData = await localforage.getItem("imageComparatorSession");
+
+          if (!sessionData) return;
+
+          // Очищаем текущие данные
+          this.imageManager.clearAll();
+          this.controlManager.clearAll();
+          this.transformer.hide();
+
+          // Загружаем изображения
+          for (const imgData of sessionData.images) {
+            const img = new Image();
+            img.src = imgData.src;
+
+            img.onload = () => {
+              const konvaImage = new Konva.Image({
+                x: imgData.x,
+                y: imgData.y,
+                image: img,
+                draggable: true,
+                scaleX: imgData.scale,
+                scaleY: imgData.scale,
+                opacity: imgData.opacity,
+                rotation: imgData.rotation,
+                visible: imgData.visible !== false,
+              });
+
+              // ДОБАВЛЯЕМ ОБРАБОТЧИКИ СОБЫТИЙ (как в addImage)
+              konvaImage.on("click", (e) => {
+                e.cancelBubble = true;
+                const imageData = this.imageManager.getAllImages().find((imgData) => imgData.konvaImage === e.target);
+                if (imageData) {
+                  this.controlManager.selectImage(imageData.id);
+                }
+              });
+
+              konvaImage.on("dragmove", () => this.saveSession());
+
+              // ВАЖНО: Добавляем обработчик wheel для масштабирования по Shift+колесо
+              konvaImage.on("wheel", (e) => {
+                if (e.evt.shiftKey) {
+                  e.evt.preventDefault();
+                  const delta = e.evt.deltaY > 0 ? -0.01 : 0.01;
+                  const newScale = Math.max(0.1, Math.min(5, konvaImage.scaleX() + delta));
+                  konvaImage.scale({ x: newScale, y: newScale });
+
+                  // Обновляем контролы
+                  const imageData = this.imageManager.getAllImages().find((img) => img.konvaImage === konvaImage);
+                  if (imageData) {
+                    this.controlManager.updateControl(imageData.id, "scale", newScale);
+                  }
+
+                  this.layer.batchDraw();
+                  this.saveSession();
+                  this.updateZoomDisplay();
+                }
+              });
+
+              this.layer.add(konvaImage);
+
+              const imageDataObj = this.imageManager.addImage(konvaImage, { name: imgData.name });
+              imageDataObj.controls = this.controlManager.createControls(imageDataObj);
+
+              // Восстанавливаем видимость
+              if (imgData.visible !== undefined) {
+                konvaImage.visible(imgData.visible);
+              }
+            };
+          }
+
+          // Восстанавливаем настройки
+          if (sessionData.darkMode) {
+            this.isDarkMode = true;
+            document.body.classList.add("dark-mode");
+            document.getElementById("toggleTheme").textContent = "Светлая тема";
+          }
+
+          if (sessionData.gridVisible) {
+            this.isGridVisible = true;
+            document.getElementById("toggleGrid").textContent = "Скрыть сетку";
+            this.drawGrid();
+          }
+
+          if (sessionData.stageScale) {
+            this.stage.scale(sessionData.stageScale);
+            this.zoomLevel = sessionData.stageScale.x;
+            this.updateZoomDisplay();
+          }
+
+          if (sessionData.stagePosition) {
+            this.stage.position(sessionData.stagePosition);
+          }
+
+          setTimeout(() => this.layer.batchDraw(), 100);
+        }
+        exportImage() {
+          const dataURL = this.stage.toDataURL({
+            mimeType: "image/png",
+            quality: 1,
+            pixelRatio: 2,
+          });
+
+          const link = document.createElement("a");
+          link.download = `image-comparator-${new Date().toISOString().slice(0, 10)}.png`;
+          link.href = dataURL;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+
+        getSelectedImage() {
+          return this.imageManager.selectedImage;
+        }
+      }
+
+      // Инициализация приложения при загрузке страницы
+      document.addEventListener("DOMContentLoaded", () => {
+        window.imageComparator = new ImageComparator();
+
+        // Восстанавливаем тему из localStorage
+        const savedDarkMode = localStorage.getItem("imageComparatorDarkMode") === "true";
+        if (savedDarkMode) {
+          imageComparator.isDarkMode = true;
+          document.body.classList.add("dark-mode");
+          document.getElementById("toggleTheme").textContent = "Светлая тема";
+        }
+
+        // Информация о горячих клавишах
+        console.log("Горячие клавиши:");
+        console.log("- Стрелки: перемещение выбранного изображения");
+        console.log("- Shift + Стрелки: быстрое перемещение");
+        console.log("- Ctrl + Колесо мыши: масштабирование сцены");
+        console.log("- Shift + Колесо мыши на изображении: масштабирование изображения");
+        console.log("- Delete/Backspace: удалить выбранное изображение");
+        console.log("- [/]: опустить/поднять изображение");
+        console.log("- {/}: отправить на задний/передний план");
+      });
+    </script>
+  </body>
+</html>
